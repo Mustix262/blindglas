@@ -14,9 +14,9 @@ import {
 } from './types';
 
 export const MIN_GLASSES = 2;
-export const MAX_GLASSES = 8;
-
-export const other = (p: PlayerIndex): PlayerIndex => (p === 0 ? 1 : 0);
+export const MAX_GLASSES = 12;
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 6;
 
 export const remaining = (s: GameState): Glass[] => s.glasses.filter((g) => !g.empty);
 
@@ -24,27 +24,77 @@ export function glassNo(id: number): number {
   return id + 1;
 }
 
+/** Standard-Glasanzahl: Spieler × 2, höchstens 12. */
+export const defaultGlassCount = (players: number) => Math.min(MAX_GLASSES, players * 2);
+
+/** Spanne für „zufällige“ Glasanzahl. Bei 2 Spielern wie bisher 2–8. */
+export function randomGlassRange(players: number): [number, number] {
+  return [Math.max(MIN_GLASSES, players), Math.min(MAX_GLASSES, Math.max(8, players * 2 + 2))];
+}
+
+// ---------------------------------------------------------------- Spieler & Reihenfolge
+
+/** Alle noch nicht ausgeschiedenen Spieler in Sitzreihenfolge. */
+export const activePlayers = (s: GameState): PlayerIndex[] =>
+  s.players.map((_, i) => i).filter((i) => !s.players[i].out);
+
+export const isActive = (s: GameState, p: PlayerIndex) => p >= 0 && p < s.players.length && !s.players[p].out;
+
+/** Aktive Mitspieler von p (ohne p selbst). */
+export const opponents = (s: GameState, p: PlayerIndex = s.current) => activePlayers(s).filter((i) => i !== p);
+
+/** Der nächste aktive Spieler in Spielrichtung (ohne Aussetzen zu berücksichtigen). */
+export function nextActive(s: GameState, from: PlayerIndex): PlayerIndex {
+  const n = s.players.length;
+  let i = from;
+  for (let k = 0; k < n; k++) {
+    i = (i + s.direction + n) % n;
+    if (!s.players[i].out) return i;
+  }
+  return from;
+}
+
+/** Löst ein Ziel auf. 'gegner' ist nur eindeutig, wenn genau ein Mitspieler übrig ist. */
+export function resolveTarget(s: GameState, t: Target, allowSelf = true): PlayerIndex {
+  if (t === 'selbst') {
+    if (!allowSelf) throw new RuleError('Du musst jemand anderen wählen');
+    return s.current;
+  }
+  if (t === 'gegner') {
+    const opp = opponents(s);
+    if (opp.length !== 1) throw new RuleError('Bitte einen Mitspieler auswählen');
+    return opp[0];
+  }
+  if (!isActive(s, t)) throw new RuleError('Dieser Spieler ist nicht mehr dabei');
+  if (t === s.current && !allowSelf) throw new RuleError('Du musst jemand anderen wählen');
+  return t;
+}
+
+// ---------------------------------------------------------------- Spielstart & Runde
+
 export function createGame(settings: Settings): GameState {
+  const n = settings.names.length;
+  if (n < MIN_PLAYERS || n > MAX_PLAYERS) throw new RuleError('2 bis 6 Spieler');
   return {
-    version: 1,
-    settings,
-    players: [
-      { name: settings.names[0], shots: 0, sips: 0, items: [] },
-      { name: settings.names[1], shots: 0, sips: 0, items: [] },
-    ],
+    version: 2,
+    settings: { ...settings, names: [...settings.names] },
+    players: settings.names.map((name) => ({ name, shots: 0, sips: 0, items: [], out: false })),
     round: 0,
     glasses: [],
     announced: { schnaps: 0, wasser: 0 },
     phase: 'rundenende',
     current: 0,
+    direction: 1,
     turnNumber: 0,
     itemUsed: false,
-    skipNext: [false, false],
+    skipNext: settings.names.map(() => false),
     forcedGlass: null,
     splitter: null,
+    beerPick: false,
     pending: [],
     after: null,
     barkeeperShots: 0,
+    winner: null,
   };
 }
 
@@ -61,8 +111,8 @@ export function startRound(prev: GameState, rng: Rng): Result {
   if (prev.phase !== 'rundenende') throw new RuleError('Die Runde läuft noch');
   const s = structuredClone(prev);
   const events: GameEvent[] = [];
-  const count =
-    s.settings.glassCount === 'zufall' ? randInt(rng, MIN_GLASSES, MAX_GLASSES) : s.settings.glassCount;
+  const [lo, hi] = randomGlassRange(activePlayers(s).length);
+  const count = s.settings.glassCount === 'zufall' ? randInt(rng, lo, hi) : s.settings.glassCount;
   const contents = distribute(rng, count);
   s.round += 1;
   s.glasses = contents.map((content, id) => ({ id, content, empty: false }));
@@ -73,29 +123,45 @@ export function startRound(prev: GameState, rng: Rng): Result {
   s.phase = 'rundenstart';
   s.turnNumber = 0;
   s.itemUsed = false;
-  s.skipNext = [false, false];
+  s.skipNext = s.players.map(() => false);
   s.forcedGlass = null;
   s.splitter = null;
+  s.beerPick = false;
   s.pending = [];
   s.after = null;
   dealRound(s, rng, events);
   return { state: s, events };
 }
 
-/** Münzwurf: wer beginnt die Runde. */
+/** Zufallsauswahl unter allen aktiven Spielern (bei zwei Spielern: Münzwurf). */
+export function drawPlayer(s: GameState, rng: Rng): PlayerIndex {
+  const candidates = activePlayers(s);
+  return candidates[Math.floor(rng() * candidates.length)];
+}
+
+/** Wer beginnt die Runde. */
 export function flipStarter(prev: GameState, rng: Rng): Result {
   if (prev.phase !== 'rundenstart') throw new RuleError('Kein Rundenstart');
   const s = structuredClone(prev);
-  const winner: PlayerIndex = rng() < 0.5 ? 0 : 1;
+  const winner = drawPlayer(s, rng);
   s.current = winner;
   s.phase = 'zug';
-  return { state: s, events: [{ kind: 'coin', winner, reason: 'start' }, { kind: 'turn', player: winner, again: false }] };
+  return {
+    state: s,
+    events: [
+      { kind: 'coin', winner, reason: 'start' },
+      { kind: 'turn', player: winner, again: false },
+    ],
+  };
 }
+
+// ---------------------------------------------------------------- Züge
 
 export function assertCanAct(s: GameState) {
   if (s.phase !== 'zug') throw new RuleError('Gerade ist kein Zug');
   if (s.pending.length) throw new RuleError('Erst den offenen Schnaps klären');
   if (s.splitter !== null) throw new RuleError('Erst die Gläser verteilen');
+  if (s.beerPick) throw new RuleError('Erst wählen, wer Bier trinkt');
 }
 
 export function liveGlass(s: GameState, id: number): Glass {
@@ -104,7 +170,7 @@ export function liveGlass(s: GameState, id: number): Glass {
   return g;
 }
 
-/** Normaler Zug: ein Glas nehmen und selbst trinken oder weitergeben. */
+/** Normaler Zug: ein Glas nehmen und selbst trinken oder jemandem geben. */
 export function takeGlass(prev: GameState, glassId: number, target: Target, rng: Rng): Result {
   assertCanAct(prev);
   if (prev.forcedGlass !== null && prev.forcedGlass !== glassId) {
@@ -112,10 +178,10 @@ export function takeGlass(prev: GameState, glassId: number, target: Target, rng:
   }
   const s = structuredClone(prev);
   const events: GameEvent[] = [];
-  const drinker = target === 'selbst' ? s.current : other(s.current);
+  const drinker = resolveTarget(s, target);
   const g = liveGlass(s, glassId);
   drink(s, [g], drinker, events);
-  const risk = target === 'selbst' && g.content === 'wasser';
+  const risk = drinker === s.current && g.content === 'wasser';
   settle(s, risk ? 'mutprobe' : 'zugende', rng, events);
   return { state: s, events };
 }
@@ -138,6 +204,21 @@ export function drink(s: GameState, glasses: Glass[], drinker: PlayerIndex | 'ni
   }
 }
 
+/** Zählt einen Shot und prüft das Shot-Limit. */
+function addShot(s: GameState, p: PlayerIndex, events: GameEvent[]) {
+  const pl = s.players[p];
+  pl.shots += 1;
+  events.push({ kind: 'shot', player: p });
+  const limit = s.settings.shotLimit;
+  if (limit === null || pl.out || pl.shots < limit || s.winner !== null) return;
+  pl.outOrder = s.players.filter((x) => x.out).length;
+  pl.out = true;
+  s.skipNext[p] = false;
+  events.push({ kind: 'out', player: p });
+  const left = activePlayers(s);
+  if (left.length === 1) s.winner = left[0];
+}
+
 /** Arbeitet offene Schnäpse ab und führt danach die Fortsetzung aus. */
 export function settle(s: GameState, after: Continuation, rng: Rng, events: GameEvent[]) {
   s.after = after;
@@ -145,15 +226,16 @@ export function settle(s: GameState, after: Continuation, rng: Rng, events: Game
 }
 
 function flush(s: GameState, rng: Rng, events: GameEvent[]) {
-  while (s.pending.length) {
+  // Steht der Sieger fest, sind übrige Schnäpse egal
+  while (s.pending.length && s.winner === null) {
     const head = s.pending[0];
     if (hasItem(s, head.player, 'schutzengel')) return; // Entscheidung abwarten
     s.pending.shift();
-    s.players[head.player].shots += 1;
-    events.push({ kind: 'shot', player: head.player });
+    addShot(s, head.player, events);
   }
   const after = s.after;
   s.after = null;
+  if (s.winner !== null) return endGame(s, events);
   if (after) continueWith(s, after, rng, events);
 }
 
@@ -170,8 +252,7 @@ export function resolvePending(prev: GameState, useProtection: boolean, rng: Rng
     p.items.splice(idx, 1);
     events.push({ kind: 'protected', player: head.player });
   } else {
-    p.shots += 1;
-    events.push({ kind: 'shot', player: head.player });
+    addShot(s, head.player, events);
   }
   flush(s, rng, events);
   return { state: s, events };
@@ -210,20 +291,30 @@ export function endTurn(s: GameState, events: GameEvent[]) {
     endRound(s, events);
     return;
   }
-  const next = other(s.current);
-  if (s.skipNext[next]) {
+  const before = s.current;
+  let next = nextActive(s, before);
+  // Wer aussetzen muss, wird einmal übersprungen
+  while (s.skipNext[next] && next !== before) {
     s.skipNext[next] = false;
     events.push({ kind: 'skip', player: next });
-    events.push({ kind: 'turn', player: s.current, again: true });
-  } else {
-    s.current = next;
-    events.push({ kind: 'turn', player: next, again: false });
+    next = nextActive(s, next);
   }
+  s.current = next;
+  events.push({ kind: 'turn', player: next, again: next === before });
 }
 
 function endRound(s: GameState, events: GameEvent[]) {
   s.phase = 'rundenende';
   s.forcedGlass = null;
-  s.skipNext = [false, false];
+  s.skipNext = s.players.map(() => false);
   events.push({ kind: 'roundEnd' });
+}
+
+function endGame(s: GameState, events: GameEvent[]) {
+  s.phase = 'spielende';
+  s.forcedGlass = null;
+  s.splitter = null;
+  s.beerPick = false;
+  s.pending = [];
+  events.push({ kind: 'gameOver', winner: s.winner! });
 }

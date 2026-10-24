@@ -26,7 +26,7 @@ describe('Verteilung', () => {
 
   it('lehnt ungültige Glasanzahlen ab', () => {
     expect(() => distribute(seededRng(1), 1)).toThrow(RuleError);
-    expect(() => distribute(seededRng(1), 9)).toThrow(RuleError);
+    expect(() => distribute(seededRng(1), 13)).toThrow(RuleError);
   });
 
   it('würfelt bei "zufall" eine Anzahl von 2 bis 8 aus', () => {

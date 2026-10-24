@@ -33,13 +33,34 @@ function write(key: string, value: unknown) {
   }
 }
 
+/** Spielstände aus der 2-Spieler-Version (v1) übernehmen. */
+function migrate(state: Record<string, unknown> & { version: number }): GameState | null {
+  if (state.version === 2) return state as unknown as GameState;
+  if (state.version !== 1) return null;
+  const s = state as unknown as GameState;
+  s.version = 2;
+  s.players = s.players.map((p) => ({ ...p, out: false }));
+  s.settings = { ...s.settings, shotLimit: null };
+  s.direction = 1;
+  s.beerPick = false;
+  s.winner = null;
+  return s;
+}
+
 export function loadGame(): SavedGame | null {
   const saved = read<SavedGame>(GAME_KEY);
-  return saved?.state?.version === 1 ? saved : null;
+  if (!saved?.state) return null;
+  const state = migrate(saved.state as unknown as Record<string, unknown> & { version: number });
+  return state ? { ...saved, state } : null;
 }
 
 export const saveGame = (g: SavedGame | null) => write(GAME_KEY, g);
 
-export const loadPrefs = (): Prefs => ({ muted: false, lastSettings: null, ...read<Prefs>(PREFS_KEY) });
+export function loadPrefs(): Prefs {
+  const p: Prefs = { muted: false, lastSettings: null, ...read<Prefs>(PREFS_KEY) };
+  // Einstellungen aus der 2-Spieler-Version kennen noch kein Shot-Limit
+  if (p.lastSettings) p.lastSettings = { ...p.lastSettings, shotLimit: p.lastSettings.shotLimit ?? null };
+  return p;
+}
 
 export const savePrefs = (p: Prefs) => write(PREFS_KEY, p);

@@ -143,9 +143,10 @@ p { margin: 0.4em 0; }
   font-size: 26px; -webkit-user-select: text; user-select: text;
 }
 .field input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 12px rgba(77, 255, 154, 0.35); }
-.chips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.chips.limits { grid-template-columns: repeat(5, 1fr); }
 .chip { min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: #000; font-family: var(--pixel); font-size: 13px; }
-.chip.wide { grid-column: 1 / -1; font-size: 11px; }
+.chip.wide { font-size: 8px; }
 .chip.on { border-color: var(--green); color: var(--green); box-shadow: 0 0 10px rgba(77, 255, 154, 0.4); }
 .toggle {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -369,6 +370,107 @@ p { margin: 0.4em 0; }
   padding: 10px 16px; border-radius: 10px;
   background: #2c060c; border: 1px solid var(--red-hot); color: #ffd6dc;
   animation: fade 0.2s;
+}
+
+/* ---------- Mehrspieler: Setup ---------- */
+.hint { margin: 0 0 8px; color: var(--muted); font-size: 18px; }
+.player-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.player-row { display: flex; align-items: center; gap: 8px; background: #000; border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; }
+.player-row.dragging { border-color: var(--green); box-shadow: 0 0 14px rgba(77, 255, 154, 0.4); opacity: 0.9; }
+.player-row input {
+  flex: 1; min-width: 0; min-height: 46px; padding: 0 8px;
+  background: transparent; border: 0; color: var(--green); font-size: 26px;
+  -webkit-user-select: text; user-select: text;
+}
+.player-row input:focus { outline: none; }
+.drag { display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 36px; height: 46px; padding: 0 8px; touch-action: none; cursor: grab; }
+.drag i { display: block; height: 3px; background: var(--muted); border-radius: 2px; }
+.seat { font-family: var(--pixel); font-size: 10px; color: var(--muted); width: 14px; text-align: center; }
+.remove { flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); color: var(--red-hot); font-size: 24px; }
+.btn.add { min-height: 48px; color: var(--green); border-style: dashed; border-color: var(--green-dim); }
+
+/* ---------- Mehrspieler: Übersicht ---------- */
+.dirbar { display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--pixel); font-size: 8px; color: var(--green); }
+.dirbar .muted { font-family: var(--mono); font-size: 18px; }
+.ico-arrow { display: inline-flex; color: var(--green); --accent: var(--green); }
+.ico-arrow .ui-svg { width: 22px; height: 14px; margin: 0; }
+.ico-arrow.flip { transform: scaleX(-1); }
+.pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pchip {
+  position: relative; min-width: 0;
+  padding: 5px 6px 6px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.pchip.active { border-color: var(--green); box-shadow: 0 0 12px rgba(77, 255, 154, 0.35); }
+.pchip.out { opacity: 0.45; }
+.pchip.out .pchip-name { text-decoration: line-through; }
+.pchip-name { font-family: var(--pixel); font-size: 8px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pchip.active .pchip-name { color: var(--green); }
+.seatno { display: inline-block; margin-right: 4px; padding: 0 3px; border-radius: 3px; background: #000; color: var(--muted); font-family: var(--pixel); font-size: 7px; }
+.pchip-nums { display: flex; align-items: center; gap: 1px; font-size: 18px; margin-top: 2px; }
+.pchip-nums b { font-family: var(--pixel); font-size: 11px; font-weight: 400; }
+.pchip-nums small { font-size: 14px; color: var(--muted); }
+.pchip-nums .ui-svg { width: 15px; height: 15px; margin: 0 4px 0 1px; }
+.tag { position: absolute; top: -7px; right: 4px; padding: 1px 4px; border-radius: 4px; font-style: normal; font-family: var(--pixel); font-size: 6px; line-height: 1.5; }
+.tag.now { background: var(--green); color: #000; }
+.tag.next { background: #000; color: var(--green); border: 1px solid var(--green-dim); }
+.tag.skip { background: var(--red); color: #fff; }
+.tag.out { background: #333; color: #aaa; }
+.score.out { opacity: 0.45; }
+.score-nums small { font-size: 16px; color: var(--muted); }
+
+/* Farben für die Zuteilung beim Teiler */
+.c0 { --pc: #4dff9a; } .c1 { --pc: #ff2d4b; } .c2 { --pc: #5fd8ff; }
+.c3 { --pc: #ffd34d; } .c4 { --pc: #c47dff; } .c5 { --pc: #ff8a3d; }
+.glass.own { border-color: var(--pc); box-shadow: 0 0 12px color-mix(in srgb, var(--pc) 55%, transparent); }
+.glass .owner { position: absolute; top: 4px; left: 2px; right: 2px; font-size: 15px; text-align: center; overflow: hidden; white-space: nowrap; color: var(--pc); }
+.brushes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.brush { min-height: 40px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--pc); background: #000; color: var(--pc); font-size: 19px; }
+.brush.on { background: color-mix(in srgb, var(--pc) 25%, #000); box-shadow: 0 0 10px var(--pc); }
+.brush.full { opacity: 0.55; }
+.brush b { font-family: var(--pixel); font-size: 9px; font-weight: 400; }
+
+/* Dichter Tisch ab 9 Gläsern */
+.table.dense { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.table.dense .glass { padding: 6px 3px 20px; border-radius: 9px; }
+.table.dense .num { font-size: 9px; bottom: 3px; }
+.table.dense .who, .table.dense .owner { font-size: 13px; }
+
+/* Items der anderen */
+.tray.compact .opp-items { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tray.compact .opp-items h4 { flex: none; width: 76px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray.compact .opp-items .item-row { gap: 4px; }
+.item-chip.icon-only { min-height: 36px; padding: 3px 5px; }
+
+/* Spielerauswahl */
+.pick-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pick-list.n1 { grid-template-columns: 1fr; }
+.pick-btn { flex-direction: row; gap: 6px; min-height: 60px; font-size: 11px; overflow: hidden; }
+
+/* Flaschendrehen */
+.spin-stage { position: relative; width: min(78vw, 300px); aspect-ratio: 1; margin: 0 auto; border-radius: 50%; border: 1px dashed var(--green-dim); box-shadow: inset 0 0 40px rgba(77, 255, 154, 0.12); }
+.spin-name { position: absolute; transform: translate(-50%, -50%); max-width: 34%; padding: 2px 6px; border-radius: 6px; background: #000; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spin-name.win { animation: winner 0.4s 2.4s forwards; }
+@keyframes winner { to { color: #000; background: var(--green); box-shadow: 0 0 16px var(--green); } }
+.bottle { position: absolute; left: 50%; top: 50%; width: 22%; transform: translate(-50%, -50%); animation: spin 2.4s cubic-bezier(0.15, 0.6, 0.2, 1) forwards; color: #c8f5d8; --accent: #1d7a4a; }
+.bottle .bottle-svg { width: 100%; height: auto; filter: drop-shadow(0 0 8px rgba(77, 255, 154, 0.5)); }
+@keyframes spin { from { transform: translate(-50%, -50%) rotate(0); } to { transform: translate(-50%, -50%) rotate(var(--end)); } }
+.spin-ov .after-anim { animation-delay: 2.45s; }
+
+/* Spielende */
+.winner-name { font-size: 26px; color: var(--green); text-shadow: 0 0 18px var(--green); }
+.out-title { color: var(--red-hot); text-shadow: 0 0 16px var(--red); }
+.ranking { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.ranking li { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+.ranking li.win { border-color: var(--green); color: var(--green); }
+
+/* Sehr schmale Displays (iPhone SE 1. Gen.) */
+@media (max-width: 359px) {
+  .screen { padding-left: calc(var(--safe-l) + 10px); padding-right: calc(var(--safe-r) + 10px); }
+  .pchip-name { font-size: 7px; }
+  .pchip-nums .ui-svg { width: 12px; height: 12px; }
+  .chip { font-size: 11px; }
+  .announce { font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

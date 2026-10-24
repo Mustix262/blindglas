@@ -12,6 +12,8 @@ export interface ItemInfo {
   secret?: boolean;
   /** Wird nicht aktiv benutzt, sondern automatisch angeboten. */
   passive?: boolean;
+  /** Kommt erst ab so vielen aktiven Spielern in den Item-Pool. */
+  minPlayers?: number;
 }
 
 export const ITEMS: Record<ItemId, ItemInfo> = {
@@ -23,7 +25,7 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   langfinger: {
     name: 'Langfinger',
-    short: 'Schnapp dir ein Item vom Gegenüber und setz es sofort ein.',
+    short: 'Schnapp dir ein Item von einem Mitspieler deiner Wahl und setz es sofort ein.',
     weight: 1,
   },
   bierpause: {
@@ -33,12 +35,12 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   doppelter: {
     name: 'Doppelter',
-    short: 'Nimm zwei Gläser auf einmal: beide selbst trinken oder beide weitergeben.',
+    short: 'Nimm zwei Gläser auf einmal: beide selbst trinken oder beide einem Mitspieler geben.',
     weight: 1,
   },
   aussetzer: {
     name: 'Aussetzer',
-    short: 'Dein Gegenüber muss den nächsten Zug aussetzen – du bist zweimal hintereinander dran.',
+    short: 'Ein Mitspieler deiner Wahl muss seinen nächsten Zug aussetzen. Zu zweit bist du dann zweimal hintereinander dran.',
     weight: 1,
   },
   abraeumer: {
@@ -48,12 +50,12 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   teiler: {
     name: 'Teiler',
-    short: 'Nur im ersten Zug einer Runde: Du teilst alle Gläser gerecht zwischen euch auf, jeder trinkt seine.',
+    short: 'Nur im ersten Zug einer Runde: Du verteilst die Gläser gleichmäßig auf alle, die noch dabei sind – jeder trinkt seine. Was übrig bleibt, bleibt stehen.',
     weight: 0.5,
   },
   muenzteiler: {
     name: 'Münzteiler',
-    short: 'Wie der Teiler – aber eine Münze entscheidet, wer aufteilen darf.',
+    short: 'Wie der Teiler – aber der Zufall (Münze oder Flasche) entscheidet, wer verteilen darf.',
     weight: 0.5,
   },
   schutzengel: {
@@ -75,43 +77,56 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   wuerfelbecher: {
     name: 'Würfelbecher',
-    short: 'Würfeln! Bei 1–2 nimmt dein Gegenüber einen Schluck Bier, bei 3–6 du selbst.',
+    short: 'Würfeln! Bei 3–6 nimmst du einen Schluck Bier. Bei 1–2 trinkt ein anderer – zu zweit dein Gegenüber, sonst suchst du aus, wer.',
     weight: 1,
+  },
+  kehrtwende: {
+    name: 'Kehrtwende',
+    short: 'Die Spielrichtung dreht sich um. Erst ab drei Spielern im Spiel.',
+    weight: 1,
+    minPlayers: 3,
   },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
 
-export function randomItem(rng: Rng): ItemId {
-  const total = ITEM_IDS.reduce((sum, id) => sum + ITEMS[id].weight, 0);
+/** Items, die bei dieser Spielerzahl ausgeteilt werden können. */
+export const itemPool = (players: number) => ITEM_IDS.filter((id) => (ITEMS[id].minPlayers ?? 0) <= players);
+
+export function randomItem(rng: Rng, players = 2): ItemId {
+  const pool = itemPool(players);
+  const total = pool.reduce((sum, id) => sum + ITEMS[id].weight, 0);
   let r = rng() * total;
-  for (const id of ITEM_IDS) {
+  for (const id of pool) {
     r -= ITEMS[id].weight;
     if (r < 0) return id;
   }
-  return ITEM_IDS[ITEM_IDS.length - 1];
+  return pool[pool.length - 1];
 }
+
+const activeCount = (s: GameState) => s.players.filter((p) => !p.out).length;
 
 /** Gibt ein Item, solange Platz ist. Liefert das Item oder null. */
 export function grant(s: GameState, player: PlayerIndex, rng: Rng): ItemId | null {
   const items = s.players[player].items;
   if (items.length >= MAX_ITEMS) return null;
-  const item = randomItem(rng);
+  const item = randomItem(rng, activeCount(s));
   items.push(item);
   return item;
 }
 
-/** Zu Rundenbeginn: beide bekommen gleich viele (2–4) zufällige Items. */
+/** Zu Rundenbeginn: alle aktiven Spieler bekommen gleich viele (2–4) zufällige Items. */
 export function dealRound(s: GameState, rng: Rng, events: GameEvent[]) {
   if (!s.settings.items) return;
   const n = randInt(rng, 2, 4);
-  const dealt: [ItemId[], ItemId[]] = [[], []];
-  for (const p of [0, 1] as const) {
+  const dealt: ItemId[][] = s.players.map(() => []);
+  s.players.forEach((pl, p) => {
+    if (pl.out) return;
     for (let i = 0; i < n; i++) {
       const item = grant(s, p, rng);
       if (item) dealt[p].push(item);
     }
-  }
+  });
   events.push({ kind: 'dealt', items: dealt });
 }
 

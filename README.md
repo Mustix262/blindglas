@@ -1,6 +1,6 @@
 # Last Call
 
-Ein Trinkspiel für zwei als Web-App fürs Handy: Das Handy füllt virtuelle Gläser mit Schnaps oder Wasser – nur es weiß, welches was ist. Läuft komplett offline, ohne Server, ohne Tracking.
+Ein Trinkspiel für 2–6 Leute als Web-App fürs Handy: Das Handy füllt virtuelle Gläser mit Schnaps oder Wasser – nur es weiß, welches was ist. Pass-and-Play reihum, optional mit Shot-Limit und Sieger. Läuft komplett offline, ohne Server, ohne Tracking.
 
 **Trinkt verantwortungsvoll. Nur für Erwachsene.**
 
@@ -17,7 +17,7 @@ npm run icons    # App-Icons neu erzeugen
 
 ## Aufbau
 
-- `src/game/` – reine Spiellogik ohne DOM: Verteilung, Züge, Items, Rundenende. Jede Aktion liefert einen neuen Zustand plus eine Liste von Ereignissen.
+- `src/game/` – reine Spiellogik ohne DOM: Verteilung, Zugreihenfolge und Spielrichtung, Items mit Zielauswahl, Ausscheiden, Rundenende. Jede Aktion liefert einen neuen Zustand plus eine Liste von Ereignissen.
 - `src/ui/` – Oberfläche: Bildschirme, Overlays, Sound (Web Audio), Haptik, Speichern im `localStorage`.
 - `tests/` – Vitest-Tests für die Logik.
 - `.github/workflows/deploy.yml` – testet, baut und veröffentlicht auf GitHub Pages.

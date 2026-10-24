@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'Last Call',
         short_name: 'Last Call',
-        description: 'Trinkspiel für zwei: Schnaps oder Wasser – nur das Handy weiß es.',
+        description: 'Trinkspiel für 2–6: Schnaps oder Wasser – nur das Handy weiß es.',
         lang: 'de',
         start_url: base,
         scope: base,

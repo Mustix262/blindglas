@@ -63,6 +63,31 @@ export const speakerSvg = (muted: boolean) => pixels(muted ? SPEAKER_OFF : SPEAK
 export const shotSvg = () => `<span class="ico-shot">${pixels(GLASS, 'px ui-svg')}</span>`;
 export const beerSvg = () => `<span class="ico-beer">${pixels(ICON_BEER, 'px ui-svg')}</span>`;
 
+const ARROW = ['#.....#.....', '##....##....', '###...###...', '####..####..', '###...###...', '##....##....', '#.....#.....'];
+
+/** Pfeil für die Spielrichtung (zeigt bei −1 nach links). */
+export const arrowSvg = (dir: 1 | -1) => `<span class="ico-arrow ${dir === 1 ? '' : 'flip'}">${pixels(ARROW, 'px ui-svg')}</span>`;
+
+const BOTTLE = [
+  '....##....',
+  '....##....',
+  '....##....',
+  '....##....',
+  '...####...',
+  '..######..',
+  '.########.',
+  '.#++++++#.',
+  '.#++++++#.',
+  '.#++++++#.',
+  '.#++++++#.',
+  '.#++++++#.',
+  '.#++++++#.',
+  '.########.',
+];
+
+/** Eigene Flasche für die Zufallsauswahl – der Hals zeigt auf den Gewinner. */
+export const bottleSvg = () => pixels(BOTTLE, 'px bottle-svg');
+
 export const glassSvg = (full: boolean) => pixels(full ? GLASS : GLASS_EMPTY, 'px glass-svg');
 
 const ICON_BEER = [
@@ -221,6 +246,20 @@ const ICONS: Record<ItemId, string[]> = {
     '..#.......#.',
     '...#.....#..',
     '....#####...',
+  ],
+  kehrtwende: [
+    '..#.........',
+    '.##.........',
+    '##########..',
+    '##########..',
+    '.##.........',
+    '..#.........',
+    '.........+..',
+    '.........++.',
+    '..++++++++++',
+    '..++++++++++',
+    '.........++.',
+    '.........+..',
   ],
   wuerfelbecher: [
     '############',

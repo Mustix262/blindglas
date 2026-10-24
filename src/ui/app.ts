@@ -1,19 +1,39 @@
-import { createGame, flipStarter, glassNo, other, remaining, resolvePending, startRound, takeGlass } from '../game/engine';
+import {
+  MAX_GLASSES,
+  MAX_PLAYERS,
+  MIN_GLASSES,
+  MIN_PLAYERS,
+  activePlayers,
+  createGame,
+  defaultGlassCount,
+  flipStarter,
+  glassNo,
+  nextActive,
+  opponents,
+  remaining,
+  resolvePending,
+  startRound,
+  takeGlass,
+} from '../game/engine';
 import { ITEMS } from '../game/inventory';
-import { blockReason, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
+import { blockReason, chooseBeer, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
 import { defaultRng } from '../game/rng';
-import { RuleError, type GameEvent, type GameState, type ItemId, type PlayerIndex, type Result, type Settings, type Target } from '../game/types';
+import { RuleError, type GameEvent, type GameState, type ItemId, type PlayerIndex, type Result, type Settings } from '../game/types';
 import { buzz, isMuted, setMuted, sfx, unlockAudio } from './fx';
-import { beerSvg, dieFace, glassSvg, itemIcon, shotSvg, speakerSvg } from './icons';
+import { arrowSvg, beerSvg, bottleSvg, dieFace, glassSvg, itemIcon, shotSvg, speakerSvg } from './icons';
 import { rulesHtml } from './rules';
 import { loadGame, loadPrefs, saveGame, savePrefs, type SavedGame } from './storage';
 
 type GlassItem = 'spuernase' | 'bierpause' | 'abraeumer' | 'wendehals' | 'doppelter';
 const GLASS_ITEMS: ItemId[] = ['spuernase', 'bierpause', 'abraeumer', 'wendehals', 'doppelter'];
 
+/** Wofür gerade ein Mitspieler ausgewählt wird. */
+type PickPurpose = 'take' | 'doppelter' | 'aussetzer' | 'langfinger' | 'beer';
+
 type Sheet =
   | { kind: 'item'; item: ItemId; owner: PlayerIndex }
-  | { kind: 'steal' }
+  | { kind: 'steal'; from: PlayerIndex }
+  | { kind: 'pick'; purpose: PickPurpose; steal: boolean }
   | { kind: 'menu' }
   | { kind: 'rules' }
   | { kind: 'confirmNew' }
@@ -21,9 +41,13 @@ type Sheet =
 
 interface Ui {
   setup: Settings;
+  /** Glasanzahl folgt automatisch der Spielerzahl, bis sie von Hand gewählt wird. */
+  glassAuto: boolean;
   selected: number[];
   mode: { item: GlassItem; steal: boolean } | null;
+  stealFrom: PlayerIndex | null;
   split: Record<number, PlayerIndex>;
+  brush: PlayerIndex | null;
   sheet: Sheet | null;
   secretOpen: boolean;
   readyAt: number;
@@ -36,11 +60,22 @@ const prefs = loadPrefs();
 setMuted(prefs.muted);
 let game: SavedGame | null = loadGame();
 
+const initialSetup: Settings = prefs.lastSettings ?? {
+  names: ['', ''],
+  glassCount: defaultGlassCount(2),
+  items: true,
+  barkeeper: false,
+  shotLimit: null,
+};
+
 const ui: Ui = {
-  setup: prefs.lastSettings ?? { names: ['', ''], glassCount: 6, items: true, barkeeper: false },
+  setup: { ...initialSetup, names: [...initialSetup.names] },
+  glassAuto: initialSetup.glassCount === defaultGlassCount(initialSetup.names.length),
   selected: [],
   mode: null,
+  stealFrom: null,
   split: {},
+  brush: null,
   sheet: null,
   secretOpen: false,
   readyAt: 0,
@@ -54,11 +89,17 @@ let toastTimer = 0;
 
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const nameOf = (s: GameState, p: PlayerIndex | 'barkeeper') => (p === 'barkeeper' ? 'Barkeeper' : esc(s.players[p].name));
+/** Bei genau einem Mitspieler ist das Ziel klar – dann wird nicht gefragt (wie im 2-Spieler-Spiel). */
+const soleOpponent = (s: GameState): PlayerIndex | null => {
+  const opp = opponents(s);
+  return opp.length === 1 ? opp[0] : null;
+};
 
 export function mount(el: HTMLElement) {
   root = el;
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
+  root.addEventListener('pointerdown', onDragStart);
   render();
 }
 
@@ -71,7 +112,9 @@ function persist() {
 function resetSelection() {
   ui.selected = [];
   ui.mode = null;
+  ui.stealFrom = null;
   ui.split = {};
+  ui.brush = null;
 }
 
 /** Wendet einen Spielzug an und reiht die anzuzeigenden Ereignisse ein. */
@@ -96,7 +139,7 @@ function visible(events: GameEvent[]): GameEvent[] {
   const out: GameEvent[] = [];
   events.forEach((e, i) => {
     const prev = events[i - 1];
-    if (e.kind === 'shot' || e.kind === 'dealt' || e.kind === 'roundEnd' || e.kind === 'beer' || e.kind === 'splitStart') return;
+    if (['shot', 'dealt', 'roundEnd', 'beer', 'splitStart', 'direction'].includes(e.kind)) return;
     if (e.kind === 'turn' && (e.again || (prev?.kind === 'coin' && prev.reason === 'start'))) return;
     if (e.kind === 'item' && e.item === 'langfinger') return;
     if (e.kind === 'reveal' && e.glasses.length === 0) return;
@@ -114,11 +157,7 @@ function toast(msg: string) {
   }, 2400);
 }
 
-function newGame() {
-  const settings: Settings = {
-    ...ui.setup,
-    names: [ui.setup.names[0].trim() || 'Spieler 1', ui.setup.names[1].trim() || 'Spieler 2'],
-  };
+function startGame(settings: Settings) {
   prefs.lastSettings = { ...settings, names: [...settings.names] };
   savePrefs(prefs);
   const r = startRound(createGame(settings), defaultRng);
@@ -128,6 +167,13 @@ function newGame() {
   render();
 }
 
+function newGame() {
+  startGame({
+    ...ui.setup,
+    names: ui.setup.names.map((n, i) => n.trim() || `Spieler ${i + 1}`),
+  });
+}
+
 function nextRound() {
   if (!game) return;
   game.barkeeperDone = false;
@@ -135,9 +181,10 @@ function nextRound() {
 }
 
 const wrap = (req: ItemRequest, steal: boolean): ItemRequest =>
-  steal ? { item: 'langfinger', steal: req } : req;
+  steal ? { item: 'langfinger', from: ui.stealFrom ?? undefined, steal: req } : req;
 
 function startItem(item: ItemId, steal: boolean) {
+  const s = game!.state;
   ui.sheet = null;
   if (GLASS_ITEMS.includes(item)) {
     ui.mode = { item: item as GlassItem, steal };
@@ -145,33 +192,121 @@ function startItem(item: ItemId, steal: boolean) {
     render();
     return;
   }
+  if (item === 'aussetzer') {
+    const free = opponents(s).filter((p) => !s.skipNext[p]);
+    if (free.length > 1) {
+      ui.sheet = { kind: 'pick', purpose: 'aussetzer', steal };
+      render();
+      return;
+    }
+    ui.lastGlasses = [];
+    act((st) => useItem(st, wrap({ item: 'aussetzer', target: free[0] }, steal), defaultRng));
+    return;
+  }
   ui.lastGlasses = [];
-  act((s) => useItem(s, wrap({ item } as ItemRequest, steal), defaultRng));
+  act((st) => useItem(st, wrap({ item } as ItemRequest, steal), defaultRng));
+}
+
+function pickPlayer(purpose: PickPurpose, steal: boolean, p: PlayerIndex) {
+  switch (purpose) {
+    case 'take':
+      return act((st) => takeGlass(st, st.forcedGlass ?? ui.selected[0], p, defaultRng));
+    case 'doppelter': {
+      const [a, b] = ui.selected;
+      ui.lastGlasses = [a, b];
+      return act((st) => useItem(st, wrap({ item: 'doppelter', glasses: [a, b], target: p }, steal), defaultRng));
+    }
+    case 'aussetzer':
+      return act((st) => useItem(st, wrap({ item: 'aussetzer', target: p }, steal), defaultRng));
+    case 'langfinger':
+      ui.stealFrom = p;
+      ui.sheet = { kind: 'steal', from: p };
+      return render();
+    case 'beer':
+      return act((st) => chooseBeer(st, p));
+  }
+}
+
+// ---------------------------------------------------------------- Setup
+
+function setPlayerCount(names: string[]) {
+  ui.setup.names = names;
+  if (ui.glassAuto) ui.setup.glassCount = defaultGlassCount(names.length);
+}
+
+// Drag & Drop der Sitzreihenfolge (Touch und Maus über Pointer Events)
+function onDragStart(e: PointerEvent) {
+  const handle = (e.target as HTMLElement).closest<HTMLElement>('[data-drag]');
+  if (!handle) return;
+  e.preventDefault();
+  const row = handle.closest<HTMLElement>('.player-row')!;
+  const list = row.parentElement!;
+  row.classList.add('dragging');
+  // Auf dem ganzen Dokument lauschen: Beim Umsortieren verliert der Griff sonst den Pointer-Capture
+  const move = (ev: PointerEvent) => {
+    if (ev.pointerId !== e.pointerId) return;
+    const rows = [...list.querySelectorAll<HTMLElement>('.player-row')].filter((r) => r !== row);
+    const before = rows.find((r) => {
+      const box = r.getBoundingClientRect();
+      return ev.clientY < box.top + box.height / 2;
+    });
+    if (before) list.insertBefore(row, before);
+    else list.appendChild(row);
+  };
+  const up = (ev: PointerEvent) => {
+    // Auch die Loslass-Position zählt (schnelle Wischer liefern sonst evtl. keine letzte Bewegung)
+    if (ev.pointerId !== e.pointerId) return;
+    if (ev.type === 'pointerup') move(ev);
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointercancel', up);
+    row.classList.remove('dragging');
+    const order = [...list.querySelectorAll<HTMLElement>('.player-row')].map((r) => Number(r.dataset.idx));
+    ui.setup.names = order.map((i) => ui.setup.names[i]);
+    sfx.tap();
+    render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', up);
 }
 
 // ---------------------------------------------------------------- Eingaben
 
 function onInput(e: Event) {
   const t = e.target as HTMLInputElement;
-  if (t.name === 'name0') ui.setup.names[0] = t.value;
-  if (t.name === 'name1') ui.setup.names[1] = t.value;
+  const m = /^name(\d)$/.exec(t.name);
+  if (m) ui.setup.names[Number(m[1])] = t.value;
 }
 
 function onClick(e: Event) {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
   if (!el || el.hasAttribute('disabled')) return;
   unlockAudio();
-  const act = el.dataset.act!;
-  const arg = el.dataset.arg ?? '';
-  handle(act, arg);
+  handle(el.dataset.act!, el.dataset.arg ?? '');
 }
 
 function handle(action: string, arg: string) {
   const s = game?.state;
   switch (action) {
     // Setup
+    case 'addPlayer':
+      if (ui.setup.names.length < MAX_PLAYERS) setPlayerCount([...ui.setup.names, '']);
+      sfx.tap();
+      render();
+      (root.querySelector(`input[name="name${ui.setup.names.length - 1}"]`) as HTMLInputElement | null)?.focus();
+      return;
+    case 'removePlayer':
+      if (ui.setup.names.length > MIN_PLAYERS) setPlayerCount(ui.setup.names.filter((_, i) => i !== Number(arg)));
+      sfx.tap();
+      return render();
     case 'count':
       ui.setup.glassCount = arg === 'zufall' ? 'zufall' : Number(arg);
+      ui.glassAuto = arg !== 'zufall' && Number(arg) === defaultGlassCount(ui.setup.names.length);
+      sfx.tap();
+      return render();
+    case 'limit':
+      ui.setup.shotLimit = arg === 'aus' ? null : Number(arg);
       sfx.tap();
       return render();
     case 'toggle': {
@@ -183,6 +318,14 @@ function handle(action: string, arg: string) {
     case 'start':
       sfx.turn();
       return newGame();
+    case 'rematch':
+      sfx.turn();
+      return startGame({ ...s!.settings });
+    case 'toSetup':
+      game = null;
+      persist();
+      resetSelection();
+      return render();
 
     // Allgemein
     case 'sound':
@@ -199,6 +342,7 @@ function handle(action: string, arg: string) {
       return render();
     case 'close':
       ui.sheet = null;
+      ui.stealFrom = null;
       return render();
     case 'newGame':
       game = null;
@@ -238,29 +382,48 @@ function handle(action: string, arg: string) {
     case 'glass':
       return tapGlass(Number(arg));
     case 'take': {
-      const target = arg as Target;
-      if (ui.mode?.item === 'doppelter') {
-        const [a, b] = ui.selected;
-        const steal = ui.mode.steal;
-        ui.lastGlasses = [a, b];
-        return act((st) => useItem(st, wrap({ item: 'doppelter', glasses: [a, b], target }, steal), defaultRng));
+      if (!s) return;
+      const double = ui.mode?.item === 'doppelter';
+      if (arg === 'selbst') {
+        if (double) return pickPlayer('doppelter', ui.mode!.steal, s.current);
+        return act((st) => takeGlass(st, st.forcedGlass ?? ui.selected[0], 'selbst', defaultRng));
       }
-      const id = s?.forcedGlass ?? ui.selected[0];
-      return act((st) => takeGlass(st, id, target, defaultRng));
+      const sole = soleOpponent(s);
+      if (sole !== null) return pickPlayer(double ? 'doppelter' : 'take', ui.mode?.steal ?? false, sole);
+      ui.sheet = { kind: 'pick', purpose: double ? 'doppelter' : 'take', steal: ui.mode?.steal ?? false };
+      sfx.tap();
+      return render();
     }
+    case 'pick': {
+      const sh = ui.sheet;
+      if (sh?.kind === 'pick') return pickPlayer(sh.purpose, sh.steal, Number(arg));
+      if (s?.beerPick) return pickPlayer('beer', false, Number(arg));
+      return;
+    }
+    case 'brush':
+      ui.brush = Number(arg);
+      sfx.tap();
+      return render();
     case 'cancel':
       resetSelection();
+      ui.sheet = null;
       sfx.tap();
       return render();
     case 'item': {
       const [owner, item] = arg.split(':');
-      ui.sheet = { kind: 'item', item: item as ItemId, owner: Number(owner) as PlayerIndex };
+      ui.sheet = { kind: 'item', item: item as ItemId, owner: Number(owner) };
       sfx.tap();
       return render();
     }
     case 'useItem':
       if (arg === 'langfinger') {
-        ui.sheet = { kind: 'steal' };
+        const victims = opponents(s!).filter((p) => stealable(s!, p).length);
+        if (victims.length === 1) {
+          ui.stealFrom = victims[0];
+          ui.sheet = { kind: 'steal', from: victims[0] };
+        } else {
+          ui.sheet = { kind: 'pick', purpose: 'langfinger', steal: false };
+        }
         return render();
       }
       return startItem(arg as ItemId, false);
@@ -275,25 +438,8 @@ function tapGlass(id: number) {
   const s = game?.state;
   if (!s || s.phase !== 'zug' || s.glasses[id]?.empty) return;
   sfx.tap();
-  if (s.splitter !== null) {
-    const cur = ui.split[id];
-    const share = splitShare(s);
-    const count = (p: PlayerIndex) => Object.values(ui.split).filter((v) => v === p).length;
-    delete ui.split[id];
-    // Reihum: frei → Spieler 1 → Spieler 2 → frei (volle Seiten werden übersprungen)
-    const order: (PlayerIndex | undefined)[] = [0, 1, undefined];
-    let i = order.indexOf(cur);
-    for (let n = 0; n < 3; n++) {
-      i = (i + 1) % 3;
-      const p = order[i];
-      if (p === undefined || count(p) < share) {
-        if (p !== undefined) ui.split[id] = p;
-        break;
-      }
-    }
-    return render();
-  }
-  if (s.forcedGlass !== null || s.pending.length) return;
+  if (s.splitter !== null) return assignSplit(s, id);
+  if (s.forcedGlass !== null || s.pending.length || s.beerPick) return;
   if (ui.mode) {
     if (ui.mode.item === 'doppelter') {
       ui.selected = ui.selected.includes(id) ? ui.selected.filter((g) => g !== id) : [...ui.selected, id].slice(-2);
@@ -307,6 +453,26 @@ function tapGlass(id: number) {
   render();
 }
 
+/** Teiler: Glas dem gewählten Spieler zuordnen. Ist dessen Anteil voll, geht es beim nächsten weiter. */
+function assignSplit(s: GameState, id: number) {
+  const share = splitShare(s);
+  const players = activePlayers(s);
+  const count = (p: PlayerIndex) => Object.values(ui.split).filter((v) => v === p).length;
+  const brush = ui.brush ?? players.find((p) => count(p) < share) ?? players[0];
+  if (ui.split[id] === brush) {
+    delete ui.split[id];
+    ui.brush = brush;
+    return render();
+  }
+  if (count(brush) >= share) {
+    toast(`${s.players[brush].name} hat schon ${share}`);
+    return render();
+  }
+  ui.split[id] = brush;
+  ui.brush = count(brush) >= share ? (players.find((p) => count(p) < share) ?? brush) : brush;
+  render();
+}
+
 // ---------------------------------------------------------------- Darstellung
 
 function render() {
@@ -315,6 +481,7 @@ function render() {
   if (!s) html = setupScreen();
   else if (s.phase === 'rundenstart') html = introScreen(s);
   else if (s.phase === 'rundenende') html = endScreen(s);
+  else if (s.phase === 'spielende') html = winnerScreen(s);
   else html = boardScreen(s);
   html += overlay();
   html += sheet();
@@ -337,8 +504,25 @@ function topbar(s?: GameState) {
 
 function setupScreen() {
   const st = ui.setup;
-  const counts = [2, 3, 4, 5, 6, 7, 8]
-    .map((n) => `<button class="chip ${st.glassCount === n ? 'on' : ''}" data-act="count" data-arg="${n}">${n}</button>`)
+  const n = st.names.length;
+  const rows = st.names
+    .map(
+      (name, i) => `<div class="player-row" data-idx="${i}">
+        <span class="drag" data-drag="${i}" aria-label="Verschieben">${'<i></i>'.repeat(3)}</span>
+        <span class="seat">${i + 1}</span>
+        <input name="name${i}" maxlength="14" autocomplete="off" placeholder="Spieler ${i + 1}" value="${esc(name)}" aria-label="Name Spieler ${i + 1}">
+        ${n > MIN_PLAYERS ? `<button class="remove" data-act="removePlayer" data-arg="${i}" aria-label="Spieler entfernen">×</button>` : ''}
+      </div>`,
+    )
+    .join('');
+  const counts = Array.from({ length: MAX_GLASSES - MIN_GLASSES + 1 }, (_, k) => k + MIN_GLASSES)
+    .map((c) => `<button class="chip ${st.glassCount === c ? 'on' : ''}" data-act="count" data-arg="${c}">${c}</button>`)
+    .join('');
+  const limits = ['aus', 3, 4, 5, 6, 7, 8, 9, 10]
+    .map(
+      (l) =>
+        `<button class="chip ${l === 'aus' ? 'wide2' : ''} ${(st.shotLimit ?? 'aus') === l ? 'on' : ''}" data-act="limit" data-arg="${l}">${l === 'aus' ? 'AUS' : l}</button>`,
+    )
     .join('');
   const toggle = (key: 'items' | 'barkeeper', label: string, hint: string) => `
     <button class="toggle ${st[key] ? 'on' : ''}" data-act="toggle" data-arg="${key}" role="switch" aria-checked="${st[key]}">
@@ -349,16 +533,24 @@ function setupScreen() {
     <div class="logo"><span>LAST</span><span>CALL</span></div>
     <p class="tagline">Schnaps oder Wasser? Nur das Handy weiß es.</p>
     <section class="panel">
-      <label class="field"><span>Spieler 1</span><input name="name0" maxlength="14" autocomplete="off" placeholder="Name" value="${esc(st.names[0])}"></label>
-      <label class="field"><span>Spieler 2</span><input name="name1" maxlength="14" autocomplete="off" placeholder="Name" value="${esc(st.names[1])}"></label>
+      <h3>Spieler (${n}/${MAX_PLAYERS})</h3>
+      <p class="hint">Empfohlen: 3–4 Spieler. Reihenfolge = Sitzordnung am Tisch – zum Ändern an ≡ ziehen.</p>
+      <div class="player-list">${rows}</div>
+      ${n < MAX_PLAYERS ? `<button class="btn add" data-act="addPlayer">+ SPIELER</button>` : ''}
     </section>
     <section class="panel">
       <h3>Gläser pro Runde</h3>
+      <p class="hint">${ui.glassAuto ? `Automatisch: Spieler × 2 = ${defaultGlassCount(n)}` : 'Von Hand gewählt'}</p>
       <div class="chips">${counts}<button class="chip wide ${st.glassCount === 'zufall' ? 'on' : ''}" data-act="count" data-arg="zufall">ZUFALL</button></div>
     </section>
     <section class="panel">
+      <h3>Shot-Limit</h3>
+      <p class="hint">Wer so viele Shots hatte, scheidet aus. Der Letzte gewinnt.</p>
+      <div class="chips limits">${limits}</div>
+    </section>
+    <section class="panel">
       ${toggle('items', 'Items', '2–4 Spezialkarten pro Runde')}
-      ${toggle('barkeeper', 'Mit echtem Barkeeper', 'Eine dritte Person befüllt echte Gläser nach geheimer Anweisung')}
+      ${toggle('barkeeper', 'Mit echtem Barkeeper', 'Eine weitere Person befüllt echte Gläser nach geheimer Anweisung')}
     </section>
     <button class="btn primary big" data-act="start">SPIEL STARTEN</button>
     <p class="fineprint">Trinkt verantwortungsvoll. Nur für Erwachsene.</p>
@@ -366,16 +558,54 @@ function setupScreen() {
 }
 
 function scoreboard(s: GameState) {
-  const card = (p: PlayerIndex) => {
-    const pl = s.players[p];
-    const active = s.phase === 'zug' && s.current === p && s.splitter === null;
-    return `<div class="score ${active ? 'active' : ''}">
-      <div class="score-name">${esc(pl.name)}${s.skipNext[p] ? '<em class="badge">SETZT AUS</em>' : ''}</div>
-      <div class="score-nums"><span title="Schnäpse"><b>${pl.shots}</b>${shotSvg()}</span><span title="Schlucke Bier"><b>${pl.sips}</b>${beerSvg()}</span></div>
-    </div>`;
-  };
+  const limit = s.settings.shotLimit;
+  const shots = (p: PlayerIndex) => `<b>${s.players[p].shots}</b>${limit ? `<small>/${limit}</small>` : ''}`;
   const bk = s.settings.barkeeper && s.barkeeperShots ? `<div class="barkeeper-score">Barkeeper: ${s.barkeeperShots} ${shotSvg()}</div>` : '';
-  return `<div class="scores">${card(0)}${card(1)}</div>${bk}`;
+  const isTurn = (p: PlayerIndex) => s.phase === 'zug' && s.current === p && s.splitter === null;
+
+  if (s.players.length === 2) {
+    const card = (p: PlayerIndex) => {
+      const pl = s.players[p];
+      return `<div class="score ${isTurn(p) ? 'active' : ''} ${pl.out ? 'out' : ''}">
+        <div class="score-name">${esc(pl.name)}${s.skipNext[p] ? '<em class="badge">SETZT AUS</em>' : ''}</div>
+        <div class="score-nums"><span title="Schnäpse">${shots(p)}${shotSvg()}</span><span title="Schlucke Bier"><b>${pl.sips}</b>${beerSvg()}</span></div>
+      </div>`;
+    };
+    return `<div class="scores">${card(0)}${card(1)}</div>${bk}`;
+  }
+
+  // Wer wirklich als Nächstes dran ist – Aussetzende werden übersprungen
+  let next: PlayerIndex | null = null;
+  if (s.phase === 'zug') {
+    next = nextActive(s, s.current);
+    const seen = new Set<PlayerIndex>();
+    while (s.skipNext[next] && next !== s.current && !seen.has(next)) {
+      seen.add(next);
+      next = nextActive(s, next);
+    }
+  }
+  const chips = s.players
+    .map((pl, p) => {
+      const tag = pl.out
+        ? '<em class="tag out">RAUS</em>'
+        : s.skipNext[p]
+          ? '<em class="tag skip">SETZT AUS</em>'
+          : isTurn(p)
+            ? '<em class="tag now">AM ZUG</em>'
+            : next === p
+              ? '<em class="tag next">ALS NÄCHSTES</em>'
+              : '';
+      return `<div class="pchip ${isTurn(p) ? 'active' : ''} ${pl.out ? 'out' : ''}">
+        <div class="pchip-name"><span class="seatno">${p + 1}</span>${esc(pl.name)}</div>
+        <div class="pchip-nums">${shots(p)}${shotSvg()}<b>${pl.sips}</b>${beerSvg()}</div>
+        ${tag}
+      </div>`;
+    })
+    .join('');
+  return `<div class="dirbar"><span>SPIELRICHTUNG</span>${arrowSvg(s.direction)}<span class="muted">${
+    s.direction === 1 ? '1 → 2 → 3 …' : '… 3 → 2 → 1'
+  }</span></div>
+  <div class="pgrid n${s.players.length}">${chips}</div>${bk}`;
 }
 
 function announce(s: GameState) {
@@ -388,12 +618,13 @@ function announce(s: GameState) {
 
 function introScreen(s: GameState) {
   const items = (p: PlayerIndex) =>
-    s.settings.items
+    s.settings.items && !s.players[p].out
       ? `<div class="intro-items"><h4>${esc(s.players[p].name)}</h4><div class="item-row">${
           s.players[p].items.map((it) => itemChip(p, it, true)).join('') || '<small>keine</small>'
         }</div></div>`
       : '';
   const needBk = s.settings.barkeeper && !game!.barkeeperDone;
+  const many = activePlayers(s).length > 2;
   return `${topbar(s)}
   <main class="screen intro">
     ${scoreboard(s)}
@@ -402,11 +633,11 @@ function introScreen(s: GameState) {
     ${announce(s)}
     <div class="intro-glasses">${s.glasses.map(() => `<span class="mini-glass">${glassSvg(true)}</span>`).join('')}</div>
     <p class="muted small">Welches Glas was enthält, weiß niemand.</p>
-    ${items(0)}${items(1)}
+    ${s.players.map((_, p) => items(p)).join('')}
     ${
       needBk
         ? `<button class="btn primary big" data-act="sheet" data-arg="barkeeper">BARKEEPER: GLÄSER BEFÜLLEN</button>`
-        : `<button class="btn primary big" data-act="coin">MÜNZE WERFEN</button>`
+        : `<button class="btn primary big" data-act="coin">${many ? 'FLASCHE DREHEN' : 'MÜNZE WERFEN'}</button>`
     }
   </main>`;
 }
@@ -427,26 +658,60 @@ function endScreen(s: GameState) {
   </main>`;
 }
 
-function itemChip(owner: PlayerIndex, item: ItemId, small = false) {
-  return `<button class="item-chip ${small ? 'small' : ''}" data-act="item" data-arg="${owner}:${item}">
-    ${itemIcon(item)}<span>${ITEMS[item].name}</span></button>`;
+function winnerScreen(s: GameState) {
+  const ranking = s.players
+    .map((pl, p) => ({ pl, p }))
+    // Sieger zuerst, dann wer später ausgeschieden ist
+    .sort((a, b) => Number(a.pl.out) - Number(b.pl.out) || (b.pl.outOrder ?? 0) - (a.pl.outOrder ?? 0))
+    .map(
+      ({ pl, p }, rank) =>
+        `<li class="${p === s.winner ? 'win' : ''}"><span>${rank + 1}. ${esc(pl.name)}</span><span>${pl.shots}${shotSvg()} ${pl.sips}${beerSvg()}</span></li>`,
+    )
+    .join('');
+  return `${topbar(s)}
+  <main class="screen end">
+    <p class="muted">Letzte Runde ist vorbei – es bleibt nur</p>
+    <h1 class="big-title winner-name">${nameOf(s, s.winner!)}</h1>
+    <h2 class="green">GEWINNT!</h2>
+    <ol class="ranking">${ranking}</ol>
+    <button class="btn primary big" data-act="rematch">NOCHMAL MIT DENSELBEN</button>
+    <button class="btn" data-act="toSetup">ZUM SETUP</button>
+  </main>`;
+}
+
+function itemChip(owner: PlayerIndex, item: ItemId, small = false, iconOnly = false) {
+  return `<button class="item-chip ${small ? 'small' : ''} ${iconOnly ? 'icon-only' : ''}" data-act="item" data-arg="${owner}:${item}" aria-label="${ITEMS[item].name}">
+    ${itemIcon(item)}${iconOnly ? '' : `<span>${ITEMS[item].name}</span>`}</button>`;
+}
+
+function splitBanner(s: GameState) {
+  const share = splitShare(s);
+  const players = activePlayers(s);
+  const count = (p: PlayerIndex) => Object.values(ui.split).filter((v) => v === p).length;
+  const ok = players.every((p) => count(p) === share);
+  const brush = ui.brush ?? players.find((p) => count(p) < share) ?? players[0];
+  const rest = remaining(s).length - share * players.length;
+  const chips = players
+    .map(
+      (p) => `<button class="brush ${p === brush ? 'on' : ''} ${count(p) === share ? 'full' : ''} c${players.indexOf(p) % 6}" data-act="brush" data-arg="${p}">
+        ${esc(s.players[p].name)} <b>${count(p)}/${share}</b></button>`,
+    )
+    .join('');
+  return `<div class="banner split">
+    <b>${nameOf(s, s.splitter!)} teilt auf</b>
+    <small>Spieler wählen, dann Gläser antippen – jeder bekommt ${share}.${rest ? ` ${rest === 1 ? 'Ein Glas bleibt' : `${rest} Gläser bleiben`} stehen.` : ''}</small>
+    <div class="brushes">${chips}</div>
+    <button class="btn primary" data-act="split" ${ok ? '' : 'disabled'}>AUSTRINKEN!</button>
+  </div>`;
 }
 
 function boardScreen(s: GameState) {
   const me = s.current;
   const splitting = s.splitter !== null;
+  const players = activePlayers(s);
   let banner: string;
   if (splitting) {
-    const share = splitShare(s);
-    const c = (p: PlayerIndex) => Object.values(ui.split).filter((v) => v === p).length;
-    const ok = c(0) === share && c(1) === share;
-    banner = `<div class="banner split">
-      <b>${nameOf(s, s.splitter!)} teilt auf</b>
-      <small>Tippe Gläser an: je ${share} für ${nameOf(s, 0)} (${c(0)}/${share}) und ${nameOf(s, 1)} (${c(1)}/${share}).${
-        remaining(s).length % 2 ? ' Ein Glas bleibt stehen.' : ''
-      }</small>
-      <button class="btn primary" data-act="split" ${ok ? '' : 'disabled'}>AUSTRINKEN!</button>
-    </div>`;
+    banner = splitBanner(s);
   } else if (ui.mode) {
     const what =
       ui.mode.item === 'doppelter' ? 'Wähle zwei Gläser' : `Wähle ein Glas für ${ITEMS[ui.mode.item].name}`;
@@ -461,24 +726,33 @@ function boardScreen(s: GameState) {
     .map((g) => {
       const sel = ui.selected.includes(g.id) || s.forcedGlass === g.id;
       const owner = ui.split[g.id];
-      const tag =
-        splitting && owner !== undefined ? `<span class="owner o${owner}">${esc(s.players[owner].name)}</span>` : '';
+      const colour = owner !== undefined ? players.indexOf(owner) % 6 : -1;
+      const tag = splitting && owner !== undefined ? `<span class="owner">${esc(s.players[owner].name)}</span>` : '';
       const who = g.empty
         ? `<span class="who">${g.drunkBy === 'niemand' ? 'weg' : nameOf(s, g.drunkBy as PlayerIndex | 'barkeeper')}</span>`
         : '';
       return `<button class="glass ${g.empty ? `empty ${g.content}` : 'full'} ${sel ? 'sel' : ''} ${
-        owner !== undefined ? `own${owner}` : ''
+        colour >= 0 ? `own c${colour}` : ''
       }" data-act="glass" data-arg="${g.id}" ${g.empty ? 'disabled' : ''} aria-label="Glas ${glassNo(g.id)}">
         ${glassSvg(!g.empty)}<span class="num">${glassNo(g.id)}</span>${tag}${who}</button>`;
     })
     .join('');
 
-  const myItems = s.settings.items
-    ? `<section class="tray">
+  const others = s.players.map((_, p) => p).filter((p) => p !== me && !s.players[p].out);
+  const compact = others.length > 1;
+  const otherItems = others
+    .map(
+      (p) => `<div class="opp-items">
+        <h4 class="opp">${nameOf(s, p)}</h4>
+        <div class="item-row">${s.players[p].items.map((it) => itemChip(p, it, true, compact)).join('') || '<small class="muted">keine</small>'}</div>
+      </div>`,
+    )
+    .join('');
+  const tray = s.settings.items
+    ? `<section class="tray ${compact ? 'compact' : ''}">
         <h4>Deine Items</h4>
         <div class="item-row">${s.players[me].items.map((it) => itemChip(me, it)).join('') || '<small class="muted">keine</small>'}</div>
-        <h4 class="opp">${nameOf(s, other(me))}</h4>
-        <div class="item-row">${s.players[other(me)].items.map((it) => itemChip(other(me), it, true)).join('') || '<small class="muted">keine</small>'}</div>
+        ${otherItems}
       </section>`
     : '';
 
@@ -487,32 +761,55 @@ function boardScreen(s: GameState) {
     ${scoreboard(s)}
     ${announce(s)}
     ${banner}
-    <div class="table count-${s.glasses.length}">${glasses}</div>
-    ${myItems}
+    <div class="table count-${s.glasses.length} ${s.glasses.length > 8 ? 'dense' : ''}">${glasses}</div>
+    ${tray}
   </main>
   ${decisionSheet(s)}`;
 }
 
 function decisionSheet(s: GameState) {
-  if (game!.queue.length || s.pending.length || s.splitter !== null) return '';
+  if (game!.queue.length || s.pending.length || s.splitter !== null || s.beerPick || ui.sheet) return '';
   const forced = s.forcedGlass !== null;
   const double = ui.mode?.item === 'doppelter';
   if (double ? ui.selected.length !== 2 : !forced && (ui.mode || ui.selected.length !== 1)) return '';
-  const opp = nameOf(s, other(s.current));
+  const sole = soleOpponent(s);
   const title = double
     ? `Gläser ${ui.selected.map(glassNo).join(' + ')}`
     : `Glas ${glassNo(forced ? s.forcedGlass! : ui.selected[0])}`;
-  const plural = double ? 'Beide ' : '';
+  const plural = double ? 'BEIDE ' : '';
+  const give = sole !== null ? `${plural}${nameOf(s, sole).toUpperCase()} GEBEN` : `${plural}JEMANDEM GEBEN`;
   const hint = s.settings.items ? 'Wasser = Mutprobe: Extra-Item' : 'Wasser = Mutprobe: nochmal dran';
   return `<div class="sheet decision">
     <h3>${title}</h3>
     <button class="btn primary big" data-act="take" data-arg="selbst">${plural}SELBST TRINKEN<small>${hint}</small></button>
-    <button class="btn danger big" data-act="take" data-arg="gegner">${plural}${opp.toUpperCase()} GEBEN</button>
+    <button class="btn danger big" data-act="take" data-arg="gegner">${give}</button>
     ${forced ? '' : `<button class="btn ghost" data-act="cancel">ZURÜCK</button>`}
   </div>`;
 }
 
+/** Spielerauswahl als große Buttons. */
+function playerButtons(s: GameState, list: PlayerIndex[]) {
+  return `<div class="pick-list n${list.length}">${list
+    .map((p) => `<button class="btn danger pick-btn" data-act="pick" data-arg="${p}"><span class="seatno">${p + 1}</span>${nameOf(s, p)}</button>`)
+    .join('')}</div>`;
+}
+
 // ---------------------------------------------------------------- Overlays
+
+function spinner(s: GameState, winner: PlayerIndex) {
+  const cands = activePlayers(s);
+  const step = 360 / cands.length;
+  const names = cands
+    .map((p, i) => {
+      const a = (i * step * Math.PI) / 180;
+      const x = 50 + 42 * Math.sin(a);
+      const y = 50 - 42 * Math.cos(a);
+      return `<span class="spin-name ${p === winner ? 'win' : ''}" style="left:${x}%;top:${y}%">${nameOf(s, p)}</span>`;
+    })
+    .join('');
+  const end = 360 * 5 + cands.indexOf(winner) * step;
+  return `<div class="spin-stage">${names}<div class="bottle" style="--end:${end}deg">${bottleSvg()}</div></div>`;
+}
 
 function overlay(): string {
   const s = game?.state;
@@ -528,25 +825,38 @@ function overlay(): string {
         <button class="btn primary big" data-act="angel" data-arg="ja">SCHUTZENGEL NUTZEN</button>
         <button class="btn danger big" data-act="angel" data-arg="nein">ICH TRINKE DEN SCHNAPS</button>`, 'angel');
     }
+    if (s.beerPick) {
+      return layer(`
+        <div class="ov-icon">${itemIcon('wuerfelbecher')}</div>
+        <h2>${nameOf(s, s.current)}, WER TRINKT?</h2>
+        <p>Wähle, wer einen Schluck Bier nehmen muss.</p>
+        ${playerButtons(s, opponents(s))}`);
+    }
     return '';
   }
   const cont = (label = 'WEITER') => `<button class="btn primary big" data-act="next">${label}</button>`;
   switch (e.kind) {
-    case 'coin':
+    case 'coin': {
+      const many = activePlayers(s).length > 2;
+      const anim = many
+        ? spinner(s, e.winner)
+        : `<div class="coin-stage"><div class="coin flip${activePlayers(s).indexOf(e.winner)}">
+            <div class="face f0">${esc(s.players[activePlayers(s)[0]].name.slice(0, 1).toUpperCase())}</div>
+            <div class="face f1">${esc(s.players[activePlayers(s)[1]].name.slice(0, 1).toUpperCase())}</div>
+          </div></div>`;
       return layer(
-        `<div class="coin-stage"><div class="coin flip${e.winner}">
-          <div class="face f0">${esc(s.players[0].name.slice(0, 1).toUpperCase())}</div>
-          <div class="face f1">${esc(s.players[1].name.slice(0, 1).toUpperCase())}</div>
-        </div></div>
+        `${anim}
         <div class="after-anim">
           <h2>${nameOf(s, e.winner)} ${e.reason === 'start' ? 'FÄNGT AN' : 'DARF AUFTEILEN'}</h2>
           ${cont(e.reason === 'start' ? `HANDY AN ${nameOf(s, e.winner).toUpperCase()}` : 'WEITER')}
         </div>`,
-        'coin-ov',
+        `coin-ov ${many ? 'spin-ov' : ''}`,
       );
+    }
     case 'turn':
       return layer(
-        `<p class="muted">Handy übergeben an</p><h1 class="big-title">${nameOf(s, e.player)}</h1>
+        `<p class="muted">Gib das Handy an</p><h1 class="big-title">${nameOf(s, e.player)}</h1>
+        <p class="muted small">Alle anderen: nicht aufs Display schauen.</p>
         ${cont('ICH BIN BEREIT')}`,
         'turn-ov',
       );
@@ -590,13 +900,24 @@ function overlay(): string {
       return layer(
         `<div class="ov-icon">${itemIcon('aussetzer')}</div>
         <h2>${nameOf(s, e.player)} SETZT AUS</h2>
-        <p>${nameOf(s, other(e.player))} ist nochmal dran.</p>${cont()}`,
+        <p>Der Zug geht an ${nameOf(s, s.current)}.</p>${cont()}`,
       );
     case 'protected':
       return layer(
         `<div class="ov-icon">${itemIcon('schutzengel')}</div>
         <h2>SCHUTZENGEL</h2><p>${nameOf(s, e.player)} trinkt statt des Schnapses einen Schluck Wasser.</p>${cont()}`,
         'angel',
+      );
+    case 'out':
+      return layer(
+        `<h1 class="big-title out-title">${nameOf(s, e.player)}<br>IST RAUS</h1>
+        <p>${s.settings.shotLimit} Shots erreicht – ab jetzt wird ${nameOf(s, e.player)} übersprungen.</p>
+        <p class="muted small">Wasser trinken und zuschauen!</p>${cont()}`,
+        'reveal-ov is-schnaps',
+      );
+    case 'gameOver':
+      return layer(
+        `<p class="muted">Nur noch einer übrig</p><h1 class="big-title green">${nameOf(s, e.winner)}<br>GEWINNT!</h1>${cont()}`,
       );
     case 'secret': {
       const who = e.viewer === 'barkeeper' ? 'der Barkeeper' : nameOf(s, e.viewer);
@@ -616,23 +937,30 @@ function overlay(): string {
     }
     case 'item': {
       const me = nameOf(s, e.player);
-      const opp = nameOf(s, other(e.player));
+      const sole = opponents(s, e.player).length === 1 ? opponents(s, e.player)[0] : null;
+      const victim = e.from ?? sole;
+      const target = e.target ?? sole;
+      const tName = target !== null && target !== undefined ? nameOf(s, target) : 'Jemand';
       const g = ui.lastGlasses.map(glassNo).join(' + ');
       const effect: Record<ItemId, string> = {
         spuernase: `${me} riecht heimlich an Glas ${g}.`,
         langfinger: '',
         bierpause: `${me}: einen echten Schluck Bier trinken! Danach wird Glas ${g} aufgedeckt und weggekippt.`,
         doppelter: `Zwei Gläser auf einmal: ${g}.`,
-        aussetzer: `${opp} setzt den nächsten Zug aus.`,
+        aussetzer: `${tName} setzt den nächsten Zug aus.`,
         abraeumer: `Glas ${g} wird abgeräumt.`,
         teiler: `${me} teilt die Gläser auf.`,
-        muenzteiler: 'Die Münze entscheidet, wer die Gläser aufteilt.',
+        muenzteiler: activePlayers(s).length > 2 ? 'Die Flasche entscheidet, wer die Gläser aufteilt.' : 'Die Münze entscheidet, wer die Gläser aufteilt.',
         schutzengel: '',
         fluesterpost: `${me} bekommt gleich einen geheimen Tipp.`,
         wendehals: `Glas ${g} wurde umgedreht. Was jetzt drin ist, weiß keiner.`,
         wuerfelbecher: 'Würfel fallen …',
+        kehrtwende: `Die Spielrichtung dreht sich um! ${arrowSvg(s.direction)}`,
       };
-      const head = e.stolen ? `${me} KLAUT ${opp}: ${ITEMS[e.item].name}` : `${me}: ${ITEMS[e.item].name}`;
+      const head =
+        e.stolen && victim !== null && victim !== undefined
+          ? `${me} KLAUT ${nameOf(s, victim)}: ${ITEMS[e.item].name}`
+          : `${me}: ${ITEMS[e.item].name}`;
       return layer(
         `<div class="ov-icon">${itemIcon(e.item)}</div><h2>${head.toUpperCase()}</h2>
         <p>${effect[e.item]}</p>${cont()}`,
@@ -644,7 +972,11 @@ function overlay(): string {
         `<div class="dice-slot">${dieFace(1)}</div>
         <div class="after-anim">
           <h1 class="big-title">${e.value}</h1>
-          <p><b>${nameOf(s, e.player)}</b> trinkt einen Schluck Bier!</p>
+          <p>${
+            e.player === null
+              ? `<b>${nameOf(s, s.current)}</b> darf wählen, wer einen Schluck Bier trinkt!`
+              : `<b>${nameOf(s, e.player)}</b> trinkt einen Schluck Bier!`
+          }</p>
           ${cont()}
         </div>`,
         'dice-ov',
@@ -663,14 +995,17 @@ function runOverlayFx() {
   ui.fxFor = e;
   ui.readyAt = Date.now() + 350;
   switch (e.kind) {
-    case 'coin':
-      ui.readyAt = Date.now() + 1900;
+    case 'coin': {
+      const many = activePlayers(game!.state).length > 2;
+      const dur = many ? 2400 : 1750;
+      ui.readyAt = Date.now() + dur + 150;
       sfx.coin();
       setTimeout(() => {
         sfx.land();
         buzz('light');
-      }, 1750);
+      }, dur);
       break;
+    }
     case 'reveal':
       ui.readyAt = Date.now() + 700;
       if (e.glasses.some((g) => g.content === 'schnaps')) {
@@ -680,6 +1015,15 @@ function runOverlayFx() {
         sfx.wasser();
         buzz('light');
       }
+      break;
+    case 'out':
+      ui.readyAt = Date.now() + 700;
+      sfx.schnaps();
+      buzz('strong');
+      break;
+    case 'gameOver':
+      sfx.angel();
+      buzz('strong');
       break;
     case 'dice': {
       ui.readyAt = Date.now() + 1300;
@@ -746,10 +1090,25 @@ function sheet(): string {
         <ol class="fill-list">${s.glasses.map((g) => `<li class="${g.content}"><b>Glas ${glassNo(g.id)}</b> ${g.content === 'schnaps' ? 'SCHNAPS' : 'WASSER'}</li>`).join('')}</ol>
         <button class="btn primary big" data-act="barkeeperDone">FERTIG – VERDECKEN</button>`, 'secret-ov open');
     }
+    case 'pick': {
+      if (!s) return '';
+      const titles: Record<PickPurpose, string> = {
+        take: `Wer muss Glas ${glassNo(s.forcedGlass ?? ui.selected[0])} trinken?`,
+        doppelter: `Wer bekommt beide Gläser?`,
+        aussetzer: 'Wer setzt den nächsten Zug aus?',
+        langfinger: 'Wem klaust du ein Item?',
+        beer: 'Wer trinkt den Schluck Bier?',
+      };
+      let list = opponents(s);
+      if (sh.purpose === 'aussetzer') list = list.filter((p) => !s.skipNext[p]);
+      if (sh.purpose === 'langfinger') list = list.filter((p) => stealable(s, p).length);
+      return wrapSheet(`<h3>${titles[sh.purpose]}</h3>${playerButtons(s, list)}
+        <button class="btn ghost" data-act="close">ZURÜCK</button>`);
+    }
     case 'steal': {
       if (!s) return '';
-      const loot = stealable(s);
-      return wrapSheet(`<h3>Was klaust du ${nameOf(s, other(s.current))}?</h3>
+      const loot = stealable(s, sh.from);
+      return wrapSheet(`<h3>Was klaust du ${nameOf(s, sh.from)}?</h3>
         <div class="steal-list">${loot
           .map((it) => `<button class="btn item-btn" data-act="steal" data-arg="${it}">${itemIcon(it)}<span><b>${ITEMS[it].name}</b><small>${ITEMS[it].short}</small></span></button>`)
           .join('')}</div>
