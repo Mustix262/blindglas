@@ -141,7 +141,7 @@ describe('Spielmodus-Wörter', () => {
 });
 
 describe('Kontaktformular', () => {
-  const ok = { name: 'Anna', email: 'anna@example.org', message: 'Hallo!', website: '' };
+  const ok = { name: 'Anna', email: 'anna@example.org', message: 'Hallo!', website: '', consent: true };
   const env = (over: { online?: boolean; ok?: boolean; status?: number; throws?: boolean } = {}) => {
     const fetch = vi.fn(() =>
       over.throws ? Promise.reject(new Error('net')) : Promise.resolve({ ok: over.ok ?? true, status: over.status ?? 200 }),
@@ -150,15 +150,23 @@ describe('Kontaktformular', () => {
   };
 
   it('validiert E-Mail und Nachricht, Name ist optional', () => {
-    expect(validateContact(emptyContact())).toEqual({
-      email: 'Bitte gib deine E-Mail-Adresse an.',
-      message: 'Bitte schreib eine Nachricht.',
-    });
+    const empty = validateContact(emptyContact());
+    expect(empty.email).toBe('Bitte gib deine E-Mail-Adresse an.');
+    expect(empty.message).toBe('Bitte schreib eine Nachricht.');
+    expect(empty.consent).toBeDefined();
     expect(validateContact({ ...ok, email: 'kein-at-zeichen' }).email).toBeDefined();
     expect(validateContact({ ...ok, email: 'a@b' }).email).toBeDefined();
     expect(validateContact({ ...ok, name: '' })).toEqual({});
     expect(validateContact({ ...ok, message: 'x'.repeat(MAX_MESSAGE) })).toEqual({});
     expect(validateContact({ ...ok, message: 'x'.repeat(MAX_MESSAGE + 1) }).message).toBeDefined();
+  });
+
+  it('ohne Einwilligung in die USA-Übermittlung: kein Request', async () => {
+    const e = env();
+    const r = await sendContact({ ...ok, consent: false }, e);
+    expect(r.status).toBe('invalid');
+    expect(r.status === 'invalid' && r.errors.consent).toBeTruthy();
+    expect(e.fetch).not.toHaveBeenCalled();
   });
 
   it('kein Request bei ungültigen Eingaben', async () => {
@@ -184,6 +192,7 @@ describe('Kontaktformular', () => {
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({ name: 'Anna', email: 'anna@example.org', message: 'Hallo!' });
     expect(body.website).toBeUndefined();
+    expect(body.consent).toBeUndefined();
   });
 
   it('Honeypot ausgefüllt: tut erfolgreich, sendet aber nichts', async () => {

@@ -383,8 +383,10 @@ function onDragStart(e: PointerEvent) {
 function onInput(e: Event) {
   const t = e.target as HTMLInputElement;
   if (t.form?.dataset.form === 'contact') {
-    const key = t.name as keyof ContactUi['fields'];
-    ui.contact.fields[key] = t.value;
+    const f = ui.contact.fields;
+    if (t.name === 'consent') f.consent = t.checked;
+    else if (t.name === 'name' || t.name === 'email' || t.name === 'message' || t.name === 'website') f[t.name] = t.value;
+    const key = t.name;
     if (ui.contact.status === 'ok') ui.contact.status = 'idle';
     if (key === 'message') {
       const counter = root.querySelector('[data-count]');

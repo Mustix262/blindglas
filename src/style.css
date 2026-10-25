@@ -508,6 +508,9 @@ p { margin: 0.4em 0; }
 .contact [aria-invalid='true'] { border-color: var(--red-hot); }
 .counter { align-self: flex-end; color: var(--muted); font-size: 17px; }
 .field-error { color: #ff8a9a; font-size: 18px; }
+.consent-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; font-size: 18px; line-height: 1.2; color: var(--muted); }
+.consent-check input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--green); }
+.consent-check input[aria-invalid='true'] { outline: 2px solid var(--red-hot); outline-offset: 2px; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .form-privacy { color: var(--muted); font-size: 18px; margin-top: 6px; }
 .form-note { padding: 10px 12px; border-radius: 10px; border: 1px solid; }

@@ -1,9 +1,14 @@
 /*
  * HINWEIS (nicht in der App sichtbar):
  * Die Datenschutzerklärung unten ist ein sorgfältig erstellter Entwurf, aber keine Rechtsberatung.
- * Vor der Veröffentlichung mit einem Generator (z. B. https://datenschutz-generator.de) abgleichen
- * und prüfen, ob GitHub und Formspree aktuell unter dem EU-US Data Privacy Framework zertifiziert
- * sind (Liste: https://www.dataprivacyframework.gov/list).
+ * Vor der Veröffentlichung mit einem Generator (z. B. https://datenschutz-generator.de) abgleichen.
+ *
+ * Geprüft im Oktober 2026 auf https://www.dataprivacyframework.gov/list:
+ * - GitHub: aktiv zertifiziert (EU-US DPF, Non-HR Data).
+ * - Formspree: NICHT in der Liste; die Formspree-Datenschutzerklärung nennt weder DPF noch
+ *   Standardvertragsklauseln. Deshalb holt das Kontaktformular vor dem Absenden eine ausdrückliche
+ *   Einwilligung in die Übermittlung ein (Art. 49 Abs. 1 lit. a DSGVO).
+ * - GoatCounter: Angaben (Betreiber, Serverstandort, Umgang mit IP-Adressen) noch selbst prüfen.
  */
 import { LEGAL } from '../config/legal';
 import { MAX_MESSAGE, type ContactErrors, type ContactFields } from '../legal/contact';
@@ -59,14 +64,15 @@ export function datenschutzHtml() {
 
   <h2>3. Kontaktformular (Formspree)</h2>
   <p>Wenn du das ${link('kontakt', 'Kontaktformular')} abschickst, werden deine Angaben – Name (freiwillig), E-Mail-Adresse und Nachricht – sowie technisch bedingt deine IP-Adresse an den Dienst Formspree (Formspree Inc., USA) übermittelt, der mir die Nachricht per E-Mail weiterleitet. Eine Verbindung zu Formspree entsteht erst beim Absenden, vorher nicht.</p>
-  <p>Zweck ist ausschließlich die Beantwortung deiner Anfrage. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, soweit deine Anfrage auf einen Vertrag oder vorvertragliche Maßnahmen zielt, ansonsten mein berechtigtes Interesse an der Beantwortung von Anfragen (Art. 6 Abs. 1 lit. f DSGVO). Für die Übermittlung in die USA stützt sich Formspree auf das EU-US Data Privacy Framework bzw., soweit keine Zertifizierung besteht, auf Standardvertragsklauseln der EU-Kommission (Art. 46 DSGVO). Ich speichere deine Angaben nur, bis deine Anfrage erledigt ist, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</p>
+  <p>Zweck ist ausschließlich die Beantwortung deiner Anfrage. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, soweit deine Anfrage auf einen Vertrag oder vorvertragliche Maßnahmen zielt, ansonsten mein berechtigtes Interesse an der Beantwortung von Anfragen (Art. 6 Abs. 1 lit. f DSGVO). Ich speichere deine Angaben nur, bis deine Anfrage erledigt ist, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</p>
+  <p><b>Übermittlung in die USA:</b> Formspree ist nicht unter dem EU-US Data Privacy Framework zertifiziert, und für die USA besteht insoweit kein Angemessenheitsbeschluss der EU-Kommission. Deshalb sendet das Formular nur, wenn du vorher ausdrücklich in die Übermittlung einwilligst (Art. 49 Abs. 1 lit. a DSGVO). Mögliches Risiko: In den USA ist das Datenschutzniveau nicht mit dem der EU vergleichbar; insbesondere können US-Behörden auf die Daten zugreifen, ohne dass dir dagegen wirksame Rechtsbehelfe zustehen. Du kannst die Einwilligung jederzeit für die Zukunft widerrufen. Möchtest du nicht einwilligen, schreib mir einfach eine E-Mail.</p>
 
   <h2>4. Kontakt per E-Mail (iCloud)</h2>
   <p>Schreibst du mir per E-Mail (auch Antworten auf Kontaktanfragen), wird die Nachricht über meinen E-Mail-Anbieter iCloud Mail (Apple Distribution International Ltd., Irland, bzw. Apple Inc., USA) verarbeitet. Ich nutze deine Angaben nur zur Beantwortung deiner Nachricht (Art. 6 Abs. 1 lit. b bzw. f DSGVO) und lösche sie, wenn die Anfrage erledigt ist. Mehr dazu: ${ext('https://www.apple.com/de/legal/privacy/', 'Datenschutzrichtlinie von Apple')}.</p>
 
   <h2>5. Anonyme Besucherstatistik (GoatCounter) – nur mit Einwilligung</h2>
-  <p>Nur wenn du beim ersten Start oder später in den Einstellungen ausdrücklich zustimmst, meldet die App Seitenaufrufe an den Statistikdienst GoatCounter. Erfasst werden: die aufgerufene Seite (z. B. Startseite, Impressum), die Bildschirmbreite, Browser und Betriebssystem, die ungefähre Herkunft (Land) sowie die Herkunftsseite. GoatCounter verwendet <b>keine Cookies</b> und speichert keine IP-Adressen dauerhaft; aus ihnen wird nur kurzzeitig ein anonymer Wert gebildet, um mehrfache Aufrufe zu erkennen. Es wird kein fremdes Skript geladen – die App schickt nur eine einzelne Zählanfrage.</p>
-  <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit mit Wirkung für die Zukunft widerrufen: Menü (≡) › „Statistik: aus“. Danach findet sofort keine Zählung mehr statt. Ist in deinem Browser „Do Not Track“ oder „Global Privacy Control“ aktiviert, wird auch mit Einwilligung nichts gezählt. Mehr dazu: ${ext('https://www.goatcounter.com/help/privacy', 'Datenschutz bei GoatCounter')}.</p>
+  <p>Nur wenn du beim ersten Start oder später in den Einstellungen ausdrücklich zustimmst, meldet die App Seitenaufrufe an den Statistikdienst GoatCounter (goatcounter.com). Übermittelt werden die aufgerufene Seite (z. B. Startseite, Impressum) und die Bildschirmbreite sowie – technisch bedingt bei jeder Internetverbindung – deine IP-Adresse und die Browser-Kennung. GoatCounter wertet daraus Angaben wie Browser, Betriebssystem und Land aus; ich sehe nur zusammengefasste Zahlen, keine einzelnen Personen. Es werden <b>keine Cookies</b> gesetzt oder ausgelesen, und es wird kein fremdes Skript geladen – die App schickt pro Seitenaufruf nur eine einzelne Zählanfrage.</p>
+  <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit mit Wirkung für die Zukunft widerrufen: Menü (≡) › „Statistik: aus“. Danach findet sofort keine Zählung mehr statt. Ist in deinem Browser „Do Not Track“ oder „Global Privacy Control“ aktiviert, wird auch mit Einwilligung nichts gezählt. Mehr dazu: ${ext('https://www.goatcounter.com', 'goatcounter.com')}.</p>
 
   <h2>6. Speicherung auf deinem Gerät</h2>
   <p>Die App nutzt den lokalen Speicher deines Browsers (localStorage) ausschließlich für deinen Spielstand, deine Einstellungen (z. B. Namen, Ton an/aus) und deine Entscheidungen zu Statistik und Altersbestätigung. Diese Daten bleiben auf deinem Gerät und werden nicht an mich übertragen. Damit die App offline funktioniert, speichert der Browser außerdem die Programmdateien zwischen. Du kannst alles jederzeit löschen, indem du die Websitedaten in deinem Browser löschst bzw. die App vom Home-Bildschirm entfernst.</p>
@@ -108,6 +114,10 @@ export function kontaktHtml(c: ContactUi) {
     <label class="field"><span>Nachricht *</span>
       <textarea name="message" rows="6" maxlength="${MAX_MESSAGE}" required aria-invalid="${!!c.errors.message}">${esc(c.fields.message)}</textarea>
       <small class="counter"><span data-count>${c.fields.message.length}</span> / ${MAX_MESSAGE}</small>${err('message')}</label>
+    <label class="consent-check">
+      <input type="checkbox" name="consent" ${c.fields.consent ? 'checked' : ''} aria-invalid="${!!c.errors.consent}">
+      <span>Ich willige ein, dass meine Angaben zur Beantwortung an den Dienst Formspree in den USA übermittelt werden. Mir ist bekannt, dass dort kein mit der EU vergleichbares Datenschutzniveau besteht und Behörden auf die Daten zugreifen können. *</span>
+    </label>${err('consent')}
     <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off" value="${esc(c.fields.website)}"></label></div>
     <button class="btn primary big" type="submit" ${sending ? 'disabled' : ''}>${sending ? 'WIRD GESENDET …' : 'ABSENDEN'}</button>
     <p class="form-privacy">Deine Angaben werden nur zur Beantwortung deiner Anfrage verwendet. Mehr in der ${link('datenschutz', 'Datenschutzerklärung')}.</p>

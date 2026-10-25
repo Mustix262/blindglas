@@ -12,9 +12,11 @@ export interface ContactFields {
   message: string;
   /** Honeypot: für Menschen unsichtbar, Bots füllen es aus. */
   website: string;
+  /** Einwilligung in die Übermittlung an Formspree (USA), Art. 49 Abs. 1 lit. a DSGVO. */
+  consent: boolean;
 }
 
-export type ContactErrors = Partial<Record<'email' | 'message' | 'name', string>>;
+export type ContactErrors = Partial<Record<'email' | 'message' | 'name' | 'consent', string>>;
 
 export type SendResult =
   | { status: 'ok' }
@@ -25,7 +27,7 @@ export type SendResult =
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-export const emptyContact = (): ContactFields => ({ name: '', email: '', message: '', website: '' });
+export const emptyContact = (): ContactFields => ({ name: '', email: '', message: '', website: '', consent: false });
 
 export function validateContact(f: ContactFields): ContactErrors {
   const errors: ContactErrors = {};
@@ -34,6 +36,7 @@ export function validateContact(f: ContactFields): ContactErrors {
   if (!f.message.trim()) errors.message = 'Bitte schreib eine Nachricht.';
   else if (f.message.length > MAX_MESSAGE) errors.message = `Höchstens ${MAX_MESSAGE} Zeichen.`;
   if (f.name.length > 100) errors.name = 'Der Name ist zu lang.';
+  if (!f.consent) errors.consent = 'Ohne diese Einwilligung kann das Formular nicht senden – schreib mir sonst gern eine E-Mail.';
   return errors;
 }
 
