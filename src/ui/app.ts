@@ -19,7 +19,7 @@ import { ITEMS } from '../game/inventory';
 import { blockReason, chooseBeer, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
 import { defaultRng } from '../game/rng';
 import { RuleError, type GameEvent, type GameState, type ItemId, type PlayerIndex, type Result, type Settings } from '../game/types';
-import { buzz, isMuted, setMuted, sfx, unlockAudio } from './fx';
+import { buzz, hapticsMethod, hapticsOn, isMuted, setHaptics, setMuted, sfx, unlockAudio } from './fx';
 import { arrowSvg, beerSvg, bottleSvg, dieFace, glassSvg, itemIcon, shotSvg, speakerSvg } from './icons';
 import { rulesHtml } from './rules';
 import { loadGame, loadPrefs, saveGame, savePrefs, type SavedGame } from './storage';
@@ -58,6 +58,7 @@ interface Ui {
 
 const prefs = loadPrefs();
 setMuted(prefs.muted);
+setHaptics(prefs.haptics);
 let game: SavedGame | null = loadGame();
 
 const initialSetup: Settings = prefs.lastSettings ?? {
@@ -335,6 +336,26 @@ function handle(action: string, arg: string) {
       unlockAudio();
       sfx.tap();
       return render();
+    case 'haptics':
+      setHaptics(!hapticsOn());
+      prefs.haptics = hapticsOn();
+      savePrefs(prefs);
+      buzz('light');
+      return render();
+    case 'testHaptics': {
+      const method = hapticsMethod();
+      setHaptics(true);
+      buzz('strong');
+      setHaptics(prefs.haptics);
+      toast(
+        method === 'vibrate'
+          ? 'Vibration ausgelöst.'
+          : method === 'ios-switch'
+            ? 'Nichts gespürt? Nötig sind iOS 18 oder neuer und „System-Haptik“ (Einstellungen › Töne & Haptik).'
+            : 'Dieser Browser kann leider nicht vibrieren.',
+      );
+      return render();
+    }
     case 'sheet':
       ui.sheet = { kind: arg } as Sheet;
       ui.secretOpen = false;
@@ -551,6 +572,10 @@ function setupScreen() {
     <section class="panel">
       ${toggle('items', 'Items', '2–4 Spezialkarten pro Runde')}
       ${toggle('barkeeper', 'Mit echtem Barkeeper', 'Eine weitere Person befüllt echte Gläser nach geheimer Anweisung')}
+      <div class="btn-row">
+        <button class="btn" data-act="haptics">VIBRATION: ${hapticsOn() ? 'AN' : 'AUS'}</button>
+        <button class="btn" data-act="testHaptics">TESTEN</button>
+      </div>
     </section>
     <button class="btn primary big" data-act="start">SPIEL STARTEN</button>
     <p class="fineprint">Trinkt verantwortungsvoll. Nur für Erwachsene.</p>
@@ -1072,6 +1097,10 @@ function sheet(): string {
       return wrapSheet(`<h3>Menü</h3>
         <button class="btn" data-act="sheet" data-arg="rules">REGELN</button>
         <button class="btn" data-act="sound">TON: ${isMuted() ? 'AUS' : 'AN'}</button>
+        <div class="btn-row">
+          <button class="btn" data-act="haptics">VIBRATION: ${hapticsOn() ? 'AN' : 'AUS'}</button>
+          <button class="btn" data-act="testHaptics">TESTEN</button>
+        </div>
         <button class="btn danger" data-act="sheet" data-arg="confirmNew">NEUES SPIEL</button>
         <button class="btn ghost" data-act="close">ZURÜCK</button>`);
     case 'confirmNew':
