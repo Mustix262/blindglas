@@ -12,7 +12,6 @@ export interface SavedGame {
 
 export interface Prefs {
   muted: boolean;
-  haptics: boolean;
   lastSettings: Settings | null;
 }
 
@@ -58,7 +57,7 @@ export function loadGame(): SavedGame | null {
 export const saveGame = (g: SavedGame | null) => write(GAME_KEY, g);
 
 export function loadPrefs(): Prefs {
-  const p: Prefs = { muted: false, haptics: true, lastSettings: null, ...read<Prefs>(PREFS_KEY) };
+  const p: Prefs = { muted: false, lastSettings: null, ...read<Prefs>(PREFS_KEY) };
   // Einstellungen aus der 2-Spieler-Version kennen noch kein Shot-Limit
   if (p.lastSettings) p.lastSettings = { ...p.lastSettings, shotLimit: p.lastSettings.shotLimit ?? null };
   return p;

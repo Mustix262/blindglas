@@ -45,6 +45,4 @@ Jeder weitere Push auf `main` veröffentlicht automatisch eine neue Version. Die
 2. Teilen-Symbol (Quadrat mit Pfeil) → **„Zum Home-Bildschirm“** → Hinzufügen.
 3. Last Call einmal mit Internet starten – danach läuft es auch offline.
 
-Hinweis: Safari auf dem iPhone unterstützt die Vibrations-API nicht. Die App nutzt dort ab iOS 18 einen Umweg über das System-Haptik-Feedback; auf älteren Versionen gibt es keine Vibration.
-
 Lizenzen: siehe [LICENSES.md](LICENSES.md).

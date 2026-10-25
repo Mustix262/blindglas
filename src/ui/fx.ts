@@ -1,4 +1,4 @@
-/** Sound (Web Audio, komplett synthetisch) und Haptik. */
+/** Sound (Web Audio, komplett synthetisch). */
 
 let ctx: AudioContext | null = null;
 let muted = false;
@@ -78,50 +78,3 @@ export const sfx = {
     tone(140, 0.2, { type: 'sine', gain: 0.1, delay: 0.05 });
   },
 };
-
-// ---------- Haptik ----------
-// Safari auf dem iPhone kennt navigator.vibrate nicht. Ab iOS 18 löst das
-// Umschalten eines <input switch> aber ein kurzes Haptik-Feedback aus – allerdings
-// nur direkt in einer Nutzergeste (Tippen). Deshalb wird für jeden Impuls ein
-// frischer, unsichtbarer Schalter angelegt, angetippt und sofort wieder entfernt.
-let enabled = true;
-
-export const setHaptics = (on: boolean) => (enabled = on);
-export const hapticsOn = () => enabled;
-
-/** 'vibrate' = Android & Co., 'ios-switch' = iPhone-Umweg, 'none' = gar nichts möglich. */
-export function hapticsMethod(): 'vibrate' | 'ios-switch' | 'none' {
-  if (typeof navigator.vibrate === 'function') return 'vibrate';
-  const probe = document.createElement('input');
-  probe.type = 'checkbox';
-  probe.setAttribute('switch', '');
-  // Safari kennt das switch-Attribut erst ab iOS 17.4, Haptik gibt es ab iOS 18
-  return 'switch' in probe || /iPhone|iPad/.test(navigator.userAgent) ? 'ios-switch' : 'none';
-}
-
-function iosTick() {
-  const label = document.createElement('label');
-  label.setAttribute('aria-hidden', 'true');
-  label.style.display = 'none';
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.setAttribute('switch', '');
-  label.appendChild(input);
-  document.head.appendChild(label);
-  label.click();
-  label.remove();
-}
-
-export function buzz(pattern: 'light' | 'strong') {
-  if (!enabled) return;
-  if (typeof navigator.vibrate === 'function') {
-    navigator.vibrate(pattern === 'strong' ? [90, 60, 220] : 15);
-    return;
-  }
-  // iOS: Nur der erste Impuls liegt sicher in der Nutzergeste, die weiteren sind ein Versuch
-  iosTick();
-  if (pattern === 'strong') {
-    setTimeout(iosTick, 140);
-    setTimeout(iosTick, 280);
-  }
-}
