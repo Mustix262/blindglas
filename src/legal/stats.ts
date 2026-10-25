@@ -22,6 +22,10 @@ export function browserDoNotTrack(): boolean {
   return n.doNotTrack === '1' || w.doNotTrack === '1' || n.msDoNotTrack === '1' || n.globalPrivacyControl === true;
 }
 
+/** Ist GoatCounter eingerichtet? Sonst gibt es keine Statistik – und auch keine Frage danach. */
+export const statsConfigured = (code: string = LEGAL.goatcounterCode) =>
+  goatcounterEndpoint({ goatcounterCode: code }) !== null;
+
 /** Darf gerade überhaupt gezählt werden? */
 export function statsAllowed(env: Pick<StatsEnv, 'store' | 'doNotTrack' | 'goatcounterCode'>): boolean {
   const code = env.goatcounterCode ?? LEGAL.goatcounterCode;

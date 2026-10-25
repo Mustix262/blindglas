@@ -12,6 +12,7 @@
  */
 import { LEGAL } from '../config/legal';
 import { MAX_MESSAGE, type ContactErrors, type ContactFields } from '../legal/contact';
+import { statsConfigured } from '../legal/stats';
 
 export type Route = 'impressum' | 'datenschutz' | 'kontakt';
 
@@ -50,10 +51,12 @@ export function impressumHtml() {
   <p class="muted small">Siehe auch die ${link('datenschutz', 'Datenschutzerklärung')}.</p>`;
 }
 
-export function datenschutzHtml() {
+/** @param stats Abschnitt zur Statistik nur, wenn GoatCounter eingerichtet ist. */
+export function datenschutzHtml(stats = statsConfigured()) {
+  const n = (k: number) => (stats || k < 5 ? k : k - 1);
   return `
   <h1 class="page-title">Datenschutzerklärung</h1>
-  <p>Kurz gesagt: „Last Call“ läuft komplett auf deinem Gerät. Es gibt keine Konten, keine Cookies und keine Werbung. Daten verlassen dein Gerät nur beim Laden der Website, wenn du der anonymen Statistik zustimmst oder wenn du mir über das Kontaktformular oder per E-Mail schreibst.</p>
+  <p>Kurz gesagt: „Last Call“ läuft komplett auf deinem Gerät. Es gibt keine Konten, keine Cookies und keine Werbung. Daten verlassen dein Gerät nur beim Laden der Website${stats ? ', wenn du der anonymen Statistik zustimmst' : ''} oder wenn du mir über das Kontaktformular oder per E-Mail schreibst.</p>
 
   <h2>1. Verantwortlicher</h2>
   <p>${address()}<br>E-Mail: ${mailLink()}</p>
@@ -70,18 +73,23 @@ export function datenschutzHtml() {
   <h2>4. Kontakt per E-Mail (iCloud)</h2>
   <p>Schreibst du mir per E-Mail (auch Antworten auf Kontaktanfragen), wird die Nachricht über meinen E-Mail-Anbieter iCloud Mail (Apple Distribution International Ltd., Irland, bzw. Apple Inc., USA) verarbeitet. Ich nutze deine Angaben nur zur Beantwortung deiner Nachricht (Art. 6 Abs. 1 lit. b bzw. f DSGVO) und lösche sie, wenn die Anfrage erledigt ist. Mehr dazu: ${ext('https://www.apple.com/de/legal/privacy/', 'Datenschutzrichtlinie von Apple')}.</p>
 
-  <h2>5. Anonyme Besucherstatistik (GoatCounter) – nur mit Einwilligung</h2>
-  <p>Nur wenn du beim ersten Start oder später in den Einstellungen ausdrücklich zustimmst, meldet die App Seitenaufrufe an den Statistikdienst GoatCounter (goatcounter.com). Übermittelt werden die aufgerufene Seite (z. B. Startseite, Impressum) und die Bildschirmbreite sowie – technisch bedingt bei jeder Internetverbindung – deine IP-Adresse und die Browser-Kennung. GoatCounter wertet daraus Angaben wie Browser, Betriebssystem und Land aus; ich sehe nur zusammengefasste Zahlen, keine einzelnen Personen. Es werden <b>keine Cookies</b> gesetzt oder ausgelesen, und es wird kein fremdes Skript geladen – die App schickt pro Seitenaufruf nur eine einzelne Zählanfrage.</p>
-  <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit mit Wirkung für die Zukunft widerrufen: Menü (≡) › „Statistik: aus“. Danach findet sofort keine Zählung mehr statt. Ist in deinem Browser „Do Not Track“ oder „Global Privacy Control“ aktiviert, wird auch mit Einwilligung nichts gezählt. Mehr dazu: ${ext('https://www.goatcounter.com', 'goatcounter.com')}.</p>
+  ${stats ? statsSection() : ''}
 
-  <h2>6. Speicherung auf deinem Gerät</h2>
-  <p>Die App nutzt den lokalen Speicher deines Browsers (localStorage) ausschließlich für deinen Spielstand, deine Einstellungen (z. B. Namen, Ton an/aus) und deine Entscheidungen zu Statistik und Altersbestätigung. Diese Daten bleiben auf deinem Gerät und werden nicht an mich übertragen. Damit die App offline funktioniert, speichert der Browser außerdem die Programmdateien zwischen. Du kannst alles jederzeit löschen, indem du die Websitedaten in deinem Browser löschst bzw. die App vom Home-Bildschirm entfernst.</p>
+  <h2>${n(6)}. Speicherung auf deinem Gerät</h2>
+  <p>Die App nutzt den lokalen Speicher deines Browsers (localStorage) ausschließlich für deinen Spielstand, deine Einstellungen (z. B. Namen, Ton an/aus) und deine Entscheidungen${stats ? ' zu Statistik und Altersbestätigung' : ' zur Altersbestätigung'}. Diese Daten bleiben auf deinem Gerät und werden nicht an mich übertragen. Damit die App offline funktioniert, speichert der Browser außerdem die Programmdateien zwischen. Du kannst alles jederzeit löschen, indem du die Websitedaten in deinem Browser löschst bzw. die App vom Home-Bildschirm entfernst.</p>
 
-  <h2>7. Deine Rechte</h2>
+  <h2>${n(7)}. Deine Rechte</h2>
   <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen (Art. 21). Eine erteilte Einwilligung kannst du jederzeit widerrufen (Art. 7 Abs. 3). Wende dich dafür einfach an mich (siehe oben).</p>
   <p>Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für mich zuständig ist: ${esc(LEGAL.authority.name)}, ${esc(LEGAL.authority.address)}, ${ext(LEGAL.authority.url, 'www.lda.bayern.de')}.</p>
 
   <p class="muted small">Stand: Oktober 2026</p>`;
+}
+
+function statsSection() {
+  return `
+  <h2>5. Anonyme Besucherstatistik (GoatCounter) – nur mit Einwilligung</h2>
+  <p>Nur wenn du beim ersten Start oder später in den Einstellungen ausdrücklich zustimmst, meldet die App Seitenaufrufe an den Statistikdienst GoatCounter (goatcounter.com). Übermittelt werden die aufgerufene Seite (z. B. Startseite, Impressum) und die Bildschirmbreite sowie – technisch bedingt bei jeder Internetverbindung – deine IP-Adresse und die Browser-Kennung. GoatCounter wertet daraus Angaben wie Browser, Betriebssystem und Land aus; ich sehe nur zusammengefasste Zahlen, keine einzelnen Personen. Es werden <b>keine Cookies</b> gesetzt oder ausgelesen, und es wird kein fremdes Skript geladen – die App schickt pro Seitenaufruf nur eine einzelne Zählanfrage.</p>
+  <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit mit Wirkung für die Zukunft widerrufen: Menü (≡) › „Statistik: aus“. Danach findet sofort keine Zählung mehr statt. Ist in deinem Browser „Do Not Track“ oder „Global Privacy Control“ aktiviert, wird auch mit Einwilligung nichts gezählt. Mehr dazu: ${ext('https://www.goatcounter.com', 'goatcounter.com')}.</p>`;
 }
 
 export interface ContactUi {

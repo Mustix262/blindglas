@@ -14,7 +14,8 @@ import {
   statsChoice,
 } from '../src/legal/consent';
 import { emptyContact, MAX_MESSAGE, sendContact, validateContact } from '../src/legal/contact';
-import { statsAllowed, trackPageview, type StatsEnv } from '../src/legal/stats';
+import { statsAllowed, statsConfigured, trackPageview, type StatsEnv } from '../src/legal/stats';
+import { datenschutzHtml } from '../src/ui/pages';
 import { contentLabel, wording } from '../src/game/terms';
 
 describe('Konfiguration & Platzhalter', () => {
@@ -23,8 +24,8 @@ describe('Konfiguration & Platzhalter', () => {
     expect(findPlaceholders({ a: 'Echter Wert' })).toEqual([]);
   });
 
-  it('meldet aktuell nur Formspree-ID und GoatCounter-Code als offen', () => {
-    expect(findPlaceholders(LEGAL)).toEqual(['formspreeId', 'goatcounterCode']);
+  it('meldet aktuell nur den GoatCounter-Code als offen', () => {
+    expect(findPlaceholders(LEGAL)).toEqual(['goatcounterCode']);
   });
 
   it('enthält die Impressumsangaben', () => {
@@ -104,6 +105,15 @@ describe('Statistik nur mit Einwilligung', () => {
     setStatsChoice(e.store, 'ja');
     expect(trackPageview(e, '/')).toBe(false);
     expect(e.fetch).not.toHaveBeenCalled();
+  });
+
+  it('ohne GoatCounter-Code gibt es keine Statistik-Frage und keinen Datenschutz-Abschnitt dazu', () => {
+    expect(statsConfigured('DEIN_GOATCOUNTER_CODE')).toBe(false);
+    expect(statsConfigured('lastcall')).toBe(true);
+    expect(datenschutzHtml(false)).not.toContain('GoatCounter');
+    expect(datenschutzHtml(false)).toContain('6. Deine Rechte');
+    expect(datenschutzHtml(true)).toContain('5. Anonyme Besucherstatistik (GoatCounter)');
+    expect(datenschutzHtml(true)).toContain('7. Deine Rechte');
   });
 
   it('übersteht einen kaputten Speicher', () => {

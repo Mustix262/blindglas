@@ -23,7 +23,7 @@ import { RuleError, type GameEvent, type GameMode, type GameState, type ItemId, 
 import { LEGAL } from '../config/legal';
 import { browserStore, confirmAge, ageConfirmed, needsAgeCheck, needsStatsQuestion, resetAge, setStatsChoice, statsChoice, type StatsChoice } from '../legal/consent';
 import { emptyContact, sendContact, validateContact } from '../legal/contact';
-import { browserDoNotTrack, trackPageview } from '../legal/stats';
+import { browserDoNotTrack, statsConfigured, trackPageview } from '../legal/stats';
 import { isMuted, setMuted, sfx, unlockAudio } from './fx';
 import { arrowSvg, beerSvg, bottleSvg, dieFace, glassSvg, itemIcon, shotSvg, speakerSvg } from './icons';
 import { datenschutzHtml, impressumHtml, kontaktHtml, routeFromHash, type ContactUi, type Route } from './pages';
@@ -775,7 +775,7 @@ function legalDialogs() {
     );
   }
   // Auf Datenschutz/Impressum/Kontakt erst lesen lassen, danach wieder fragen
-  if (needsStatsQuestion(store) && !ui.route) {
+  if (statsConfigured() && needsStatsQuestion(store) && !ui.route) {
     return layer(
       `<h2>STATISTIK</h2>
       <p>Darf die App anonyme Nutzungsstatistiken erfassen? Keine Cookies, keine persönlichen Daten.</p>
@@ -1291,7 +1291,7 @@ function sheet(): string {
       return wrapSheet(`<h3>Menü</h3>
         <button class="btn" data-act="sheet" data-arg="rules">REGELN</button>
         <button class="btn" data-act="sound">TON: ${isMuted() ? 'AUS' : 'AN'}</button>
-        <button class="btn" data-act="stats" data-arg="${statsChoice(store) === 'ja' ? 'nein' : 'ja'}">STATISTIK: ${statsChoice(store) === 'ja' ? 'AN' : 'AUS'}</button>
+        ${statsConfigured() ? `<button class="btn" data-act="stats" data-arg="${statsChoice(store) === 'ja' ? 'nein' : 'ja'}">STATISTIK: ${statsChoice(store) === 'ja' ? 'AN' : 'AUS'}</button>` : ''}
         ${ageConfirmed(store) ? '<button class="btn" data-act="ageReset">ALTERSBESTÄTIGUNG ZURÜCKSETZEN</button>' : ''}
         <div class="menu-links">
           <a href="#/impressum" data-act="route" data-arg="impressum">Impressum</a>
