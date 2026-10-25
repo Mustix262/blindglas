@@ -1,5 +1,6 @@
 import { randInt, type Rng } from './rng';
-import type { GameEvent, GameState, ItemId, PlayerIndex } from './types';
+import { wording } from './terms';
+import type { GameEvent, GameMode, GameState, ItemId, PlayerIndex } from './types';
 
 export const MAX_ITEMS = 8;
 
@@ -29,8 +30,8 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
     weight: 1,
   },
   bierpause: {
-    name: 'Bierpause',
-    short: 'Nimm einen echten Schluck Bier. Dafür wird ein Glas deiner Wahl aufgedeckt und weggekippt. Du bleibst am Zug.',
+    name: '{Bierpause}',
+    short: 'Nimm einen echten Schluck {Bier}. Dafür wird ein Glas deiner Wahl aufgedeckt und weggekippt. Du bleibst am Zug.',
     weight: 1,
   },
   doppelter: {
@@ -60,7 +61,7 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   schutzengel: {
     name: 'Schutzengel',
-    short: 'Rettet dich einmal: Musst du einen Schnaps trinken, darfst du stattdessen einen Schluck Wasser nehmen. Wird automatisch angeboten.',
+    short: 'Rettet dich einmal: Musst du {Schnaps} trinken, darfst du stattdessen einen Schluck Wasser nehmen. Wird automatisch angeboten.',
     weight: 1,
     passive: true,
   },
@@ -72,12 +73,12 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   },
   wendehals: {
     name: 'Wendehals',
-    short: 'Ein Glas deiner Wahl kippt um: Schnaps wird Wasser, Wasser wird Schnaps. Keiner erfährt das Ergebnis.',
+    short: 'Ein Glas deiner Wahl kippt um: {Schnaps} wird Wasser, Wasser wird {Schnaps}. Keiner erfährt das Ergebnis.',
     weight: 1,
   },
   wuerfelbecher: {
     name: 'Würfelbecher',
-    short: 'Würfeln! Bei 3–6 nimmst du einen Schluck Bier. Bei 1–2 trinkt ein anderer – zu zweit dein Gegenüber, sonst suchst du aus, wer.',
+    short: 'Würfeln! Bei 3–6 nimmst du einen Schluck {Bier}. Bei 1–2 trinkt ein anderer – zu zweit dein Gegenüber, sonst suchst du aus, wer.',
     weight: 1,
   },
   kehrtwende: {
@@ -89,6 +90,10 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
+
+/** Name und Beschreibung passend zum Spielmodus. */
+export const itemName = (id: ItemId, mode: GameMode) => wording(ITEMS[id].name, mode);
+export const itemText = (id: ItemId, mode: GameMode) => wording(ITEMS[id].short, mode);
 
 /** Items, die bei dieser Spielerzahl ausgeteilt werden können. */
 export const itemPool = (players: number) => ITEM_IDS.filter((id) => (ITEMS[id].minPlayers ?? 0) <= players);

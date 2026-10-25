@@ -12,10 +12,10 @@ import {
   settle,
 } from './engine';
 import { ITEMS } from './inventory';
+import { contentLabel, terms } from './terms';
 import { pick, randInt, type Rng } from './rng';
 import {
   RuleError,
-  type Content,
   type GameEvent,
   type GameState,
   type ItemId,
@@ -43,7 +43,6 @@ export type ItemRequest =
 /** Wem das Item gehört: dem aktuellen Spieler, dem einzigen Gegner oder einem bestimmten Mitspieler. */
 export type Source = 'selbst' | 'gegner' | PlayerIndex;
 
-const label = (c: Content) => (c === 'schnaps' ? 'Schnaps' : 'Wasser');
 const UNSTEALABLE: ItemId[] = ['langfinger', 'schutzengel'];
 
 function ownerOf(s: GameState, from: Source): PlayerIndex {
@@ -69,7 +68,7 @@ export function blockReason(s: GameState, item: ItemId, from: Source = 'selbst')
   const players = activePlayers(s).length;
   switch (item) {
     case 'schutzengel':
-      return 'Wird automatisch angeboten, wenn du einen Schnaps trinken musst';
+      return `Wird automatisch angeboten, wenn du ${s.settings.mode === 'alkohol' ? 'einen' : 'eine'} ${terms(s.settings.mode).bad} trinken musst`;
     case 'bierpause':
       return left < 2 ? 'Nicht beim letzten Glas' : null;
     case 'doppelter':
@@ -162,7 +161,7 @@ function apply(
     case 'spuernase': {
       const g = liveGlass(s, req.glass);
       s.forcedGlass = g.id;
-      events.push({ kind: 'secret', viewer: me, text: `Glas ${glassNo(g.id)} ist ${label(g.content)}` });
+      events.push({ kind: 'secret', viewer: me, text: `Glas ${glassNo(g.id)} ist ${contentLabel(g.content, s.settings.mode)}` });
       return;
     }
     case 'bierpause': {
@@ -204,7 +203,7 @@ function apply(
     }
     case 'fluesterpost': {
       const g = pick(rng, remaining(s));
-      events.push({ kind: 'secret', viewer: me, text: `Glas ${glassNo(g.id)} ist ${label(g.content)}` });
+      events.push({ kind: 'secret', viewer: me, text: `Glas ${glassNo(g.id)} ist ${contentLabel(g.content, s.settings.mode)}` });
       return;
     }
     case 'wendehals': {
@@ -214,7 +213,7 @@ function apply(
         events.push({
           kind: 'secret',
           viewer: 'barkeeper',
-          text: `Glas ${glassNo(g.id)} heimlich umfüllen: jetzt ${label(g.content)}`,
+          text: `Glas ${glassNo(g.id)} heimlich umfüllen: jetzt ${contentLabel(g.content, s.settings.mode)}`,
         });
       }
       return;
@@ -246,7 +245,7 @@ function apply(
   }
 }
 
-/** Nach einer 1–2 beim Würfelbecher: der Werfer bestimmt, wer einen Schluck Bier trinkt. */
+/** Nach einer 1–2 beim Würfelbecher: der Werfer bestimmt, wer einen Schluck trinkt. */
 export function chooseBeer(prev: GameState, target: PlayerIndex): Result {
   if (!prev.beerPick) throw new RuleError('Gerade nichts zu wählen');
   const s = structuredClone(prev);

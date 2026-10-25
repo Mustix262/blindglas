@@ -464,6 +464,62 @@ p { margin: 0.4em 0; }
 .ranking li { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
 .ranking li.win { border-color: var(--green); color: var(--green); }
 
+/* ---------- Spielmodus ---------- */
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-btn {
+  display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;
+  min-height: 72px; padding: 8px; border-radius: 12px;
+  border: 1px solid var(--line); background: #000; text-align: center;
+}
+.mode-btn b { font-family: var(--pixel); font-size: 10px; font-weight: 400; }
+.mode-btn small { color: var(--muted); font-size: 17px; line-height: 1.1; }
+.mode-btn.on { border-color: var(--green); color: var(--green); box-shadow: 0 0 10px rgba(77, 255, 154, 0.4); }
+/* Klassisch (alkoholfrei): Zitrone statt Schnaps */
+.mode-klassisch :is(.a-schnaps, .r, .reveal-title.schnaps, .end-glass.schnaps, .glass.empty.schnaps, .fill-list .schnaps) {
+  --red-hot: #ffe14d; --red: #b38f00;
+  color: #ffe14d;
+}
+.mode-klassisch .a-schnaps, .mode-klassisch .reveal-title.schnaps { text-shadow: 0 0 12px #b38f00; }
+.mode-klassisch :is(.glass.empty.schnaps, .fill-list .schnaps) { border-color: #ffe14d; }
+.mode-klassisch .reveal-glass.schnaps { --liquid: #ffe14d; filter: drop-shadow(0 0 18px #b38f00); }
+.mode-klassisch .ico-shot { --liquid: #ffe14d; }
+.mode-klassisch .ico-beer { --liquid: #ff9a3d; }
+
+/* ---------- Rechtliches ---------- */
+.legal-links, .menu-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 20px; }
+.legal-links { padding: 4px 0 8px; }
+.menu-links { padding: 6px 0; }
+.legal-links a, .menu-links a, .legal a, .ov-box a, .rules a { color: var(--green); text-underline-offset: 3px; }
+.legal-links a, .menu-links a { display: inline-block; min-height: 44px; line-height: 44px; }
+.page .back { align-self: flex-start; width: auto; min-height: 44px; padding: 0 4px; color: var(--green); }
+.legal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; font-size: 20px; line-height: 1.3; -webkit-user-select: text; user-select: text; overflow-wrap: anywhere; }
+.legal .page-title { font-size: 13px; color: var(--green); margin-top: 0; line-height: 1.5; }
+.legal h2 { font-size: 11px; color: var(--green); margin-top: 1.4em; line-height: 1.6; }
+.legal p { margin: 0.5em 0; }
+
+/* Kontaktformular */
+.contact { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.contact textarea {
+  min-height: 150px; padding: 10px 12px; resize: vertical;
+  background: #000; color: var(--green); border: 1px solid var(--green-dim); border-radius: 10px;
+  font: inherit; font-size: 22px; -webkit-user-select: text; user-select: text;
+}
+.contact textarea:focus { outline: none; border-color: var(--green); }
+.contact [aria-invalid='true'] { border-color: var(--red-hot); }
+.counter { align-self: flex-end; color: var(--muted); font-size: 17px; }
+.field-error { color: #ff8a9a; font-size: 18px; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.form-privacy { color: var(--muted); font-size: 18px; margin-top: 6px; }
+.form-note { padding: 10px 12px; border-radius: 10px; border: 1px solid; }
+.form-note.sending { border-color: var(--green-dim); color: var(--muted); }
+.form-note.ok { border-color: var(--green); color: var(--green); background: rgba(14, 42, 28, 0.6); }
+.form-note.error { border-color: var(--red-hot); color: #ffd6dc; background: rgba(192, 20, 46, 0.18); }
+
+/* Statistik- und Altersdialog: beide Antworten gleich groß und gleich auffällig */
+.legal-ov { z-index: 70; }
+.choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn.choice { min-height: 60px; font-size: 13px; background: var(--bg2); border-color: var(--green-dim); color: var(--text); }
+
 /* Sehr schmale Displays (iPhone SE 1. Gen.) */
 @media (max-width: 359px) {
   .screen { padding-left: calc(var(--safe-l) + 10px); padding-right: calc(var(--safe-r) + 10px); }

@@ -1,8 +1,8 @@
 # Last Call
 
-Ein Trinkspiel für 2–6 Leute als Web-App fürs Handy: Das Handy füllt virtuelle Gläser mit Schnaps oder Wasser – nur es weiß, welches was ist. Pass-and-Play reihum, optional mit Shot-Limit und Sieger. Läuft komplett offline, ohne Server, ohne Tracking.
+Ein Partyspiel für 2–6 Leute als Web-App fürs Handy: Das Handy füllt virtuelle Gläser – nur es weiß, welches was enthält. Zwei Modi: **Klassisch** (alkoholfrei, Zitrone & Limo) und **Alkoholmodus** (Schnaps & Bier, nur ab 18, mit Altersabfrage). Pass-and-Play reihum, optional mit Shot-Limit und Sieger. Läuft komplett offline, ohne Konten, ohne Cookies; Statistik nur mit Einwilligung.
 
-**Trinkt verantwortungsvoll. Nur für Erwachsene.**
+**Nutzung auf eigene Verantwortung. Kein Gruppenzwang. Im Alkoholmodus verantwortungsvoll trinken und danach nie Auto fahren.**
 
 ## Entwickeln
 
@@ -10,7 +10,8 @@ Ein Trinkspiel für 2–6 Leute als Web-App fürs Handy: Das Handy füllt virtue
 npm install
 npm run dev      # Entwicklungsserver (im WLAN auch vom Handy erreichbar)
 npm test         # Unit-Tests der Spiellogik (Vitest)
-npm run build    # Produktions-Build nach dist/
+npm run build    # Produktions-Build nach dist/ (prüft danach auf externe URLs)
+npm run check:external  # nur die URL-Prüfung von dist/
 npm run preview  # Build lokal ansehen
 npm run icons    # App-Icons neu erzeugen
 ```
@@ -18,8 +19,11 @@ npm run icons    # App-Icons neu erzeugen
 ## Aufbau
 
 - `src/game/` – reine Spiellogik ohne DOM: Verteilung, Zugreihenfolge und Spielrichtung, Items mit Zielauswahl, Ausscheiden, Rundenende. Jede Aktion liefert einen neuen Zustand plus eine Liste von Ereignissen.
-- `src/ui/` – Oberfläche: Bildschirme, Overlays, Sound (Web Audio), Haptik, Speichern im `localStorage`.
-- `tests/` – Vitest-Tests für die Logik.
+- `src/ui/` – Oberfläche: Bildschirme, Overlays, Sound (Web Audio), Speichern im `localStorage`, Impressum/Datenschutz/Kontakt (`pages.ts`).
+- `src/config/legal.ts` – **alle rechtlichen Angaben an einer Stelle** (Impressum, Formspree-ID, GoatCounter-Code). Der Build warnt, solange Platzhalter (`DEIN_…`) drinstehen.
+- `src/legal/` – Einwilligung (Statistik, Altersabfrage), Kontaktformular, Statistik – ohne DOM, mit Tests.
+- `scripts/check-build.ts` – prüft den Build auf nicht erlaubte externe URLs (erlaubt: GoatCounter nach Einwilligung, Formspree beim Absenden).
+- `tests/` – Vitest-Tests für Logik und Rechtliches.
 - `.github/workflows/deploy.yml` – testet, baut und veröffentlicht auf GitHub Pages.
 
 ## Veröffentlichen auf GitHub Pages

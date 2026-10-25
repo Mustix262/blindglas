@@ -7,6 +7,7 @@ export const baseSettings = (over: Partial<Settings> = {}): Settings => ({
   items: false,
   barkeeper: false,
   shotLimit: null,
+  mode: 'alkohol',
   ...over,
 });
 

@@ -35,7 +35,9 @@ function write(key: string, value: unknown) {
 
 /** Spielstände aus der 2-Spieler-Version (v1) übernehmen. */
 function migrate(state: Record<string, unknown> & { version: number }): GameState | null {
-  if (state.version === 2) return state as unknown as GameState;
+  // Spiele von vor der Modus-Auswahl waren immer mit Schnaps & Bier
+  const withMode = (s: GameState) => ((s.settings.mode ??= 'alkohol'), s);
+  if (state.version === 2) return withMode(state as unknown as GameState);
   if (state.version !== 1) return null;
   const s = state as unknown as GameState;
   s.version = 2;
@@ -44,7 +46,7 @@ function migrate(state: Record<string, unknown> & { version: number }): GameStat
   s.direction = 1;
   s.beerPick = false;
   s.winner = null;
-  return s;
+  return withMode(s);
 }
 
 export function loadGame(): SavedGame | null {

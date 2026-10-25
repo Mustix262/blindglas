@@ -15,12 +15,18 @@ import {
   startRound,
   takeGlass,
 } from '../game/engine';
-import { ITEMS } from '../game/inventory';
+import { itemName, itemText } from '../game/inventory';
 import { blockReason, chooseBeer, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
 import { defaultRng } from '../game/rng';
-import { RuleError, type GameEvent, type GameState, type ItemId, type PlayerIndex, type Result, type Settings } from '../game/types';
+import { terms } from '../game/terms';
+import { RuleError, type GameEvent, type GameMode, type GameState, type ItemId, type PlayerIndex, type Result, type Settings } from '../game/types';
+import { LEGAL } from '../config/legal';
+import { browserStore, confirmAge, ageConfirmed, needsAgeCheck, needsStatsQuestion, resetAge, setStatsChoice, statsChoice, type StatsChoice } from '../legal/consent';
+import { emptyContact, sendContact, validateContact } from '../legal/contact';
+import { browserDoNotTrack, trackPageview } from '../legal/stats';
 import { isMuted, setMuted, sfx, unlockAudio } from './fx';
 import { arrowSvg, beerSvg, bottleSvg, dieFace, glassSvg, itemIcon, shotSvg, speakerSvg } from './icons';
+import { datenschutzHtml, impressumHtml, kontaktHtml, routeFromHash, type ContactUi, type Route } from './pages';
 import { rulesHtml } from './rules';
 import { loadGame, loadPrefs, saveGame, savePrefs, type SavedGame } from './storage';
 
@@ -54,19 +60,32 @@ interface Ui {
   lastGlasses: number[];
   fxFor: GameEvent | null;
   toast: string | null;
+  /** Geöffnete Rechtsseite (Impressum, Datenschutz, Kontakt) oder null fürs Spiel. */
+  route: Route | null;
+  /** Seite wurde aus der App heraus geöffnet → „Zurück“ geht in der Browser-History zurück. */
+  routeFromApp: boolean;
+  contact: ContactUi;
+  /** Offene Altersabfrage; after = was nach „Bestätigen“ passiert. */
+  ageDialog: null | { after: 'mode' | 'start' | 'rematch' };
 }
 
 const prefs = loadPrefs();
 setMuted(prefs.muted);
 let game: SavedGame | null = loadGame();
 
-const initialSetup: Settings = prefs.lastSettings ?? {
+const store = browserStore();
+
+const DEFAULT_SETUP: Settings = {
   names: ['', ''],
   glassCount: defaultGlassCount(2),
   items: true,
   barkeeper: false,
   shotLimit: null,
+  mode: 'klassisch',
 };
+const initialSetup: Settings = { ...DEFAULT_SETUP, ...prefs.lastSettings };
+// Ohne (noch gültige) Altersbestätigung startet das Setup immer alkoholfrei
+if (needsAgeCheck(initialSetup.mode, store)) initialSetup.mode = 'klassisch';
 
 const ui: Ui = {
   setup: { ...initialSetup, names: [...initialSetup.names] },
@@ -82,6 +101,10 @@ const ui: Ui = {
   lastGlasses: [],
   fxFor: null,
   toast: null,
+  route: null,
+  routeFromApp: false,
+  contact: { fields: emptyContact(), errors: {}, status: 'idle', message: '' },
+  ageDialog: null,
 };
 
 let root: HTMLElement;
@@ -95,12 +118,96 @@ const soleOpponent = (s: GameState): PlayerIndex | null => {
   return opp.length === 1 ? opp[0] : null;
 };
 
+// Wörter hängen vom Spielmodus ab (Klassisch = alkoholfrei, Alkoholmodus = Schnaps & Bier)
+const currentMode = (): GameMode => game?.state.settings.mode ?? ui.setup.mode;
+const T = () => terms(currentMode());
+const BAD = () => T().bad.toUpperCase();
+const iName = (id: ItemId) => itemName(id, currentMode());
+const iText = (id: ItemId) => itemText(id, currentMode());
+
+/** Seitenaufruf an die Statistik melden – passiert nur mit Einwilligung (siehe legal/stats.ts). */
+function track(path: string) {
+  trackPageview(
+    {
+      store,
+      fetch: (url, init) => fetch(url, init),
+      doNotTrack: browserDoNotTrack(),
+      online: navigator.onLine,
+      screenWidth: window.screen?.width ?? 0,
+    },
+    path,
+  );
+}
+
+function onRoute() {
+  ui.route = routeFromHash(location.hash);
+  if (!ui.route) ui.routeFromApp = false;
+  ui.sheet = null;
+  window.scrollTo(0, 0);
+  render();
+  if (ui.route) track(`/${ui.route}`);
+}
+
+function openRoute(route: Route) {
+  ui.routeFromApp = true;
+  location.hash = `#/${route}`;
+}
+
+function closeRoute() {
+  if (ui.routeFromApp) {
+    history.back();
+    return;
+  }
+  history.replaceState(null, '', location.pathname + location.search);
+  onRoute();
+}
+
+async function submitContact() {
+  const c = ui.contact;
+  if (c.status === 'sending') return;
+  c.errors = validateContact(c.fields);
+  if (Object.keys(c.errors).length) {
+    c.status = 'idle';
+    render();
+    (root.querySelector('[aria-invalid="true"]') as HTMLElement | null)?.focus();
+    return;
+  }
+  c.status = 'sending';
+  render();
+  const r = await sendContact(c.fields, { fetch: (url, init) => fetch(url, init), online: navigator.onLine });
+  if (r.status === 'ok') {
+    c.fields = emptyContact();
+    c.status = 'ok';
+  } else if (r.status === 'invalid') {
+    c.errors = r.errors;
+    c.status = 'idle';
+  } else {
+    c.status = r.status;
+    c.message = r.status === 'error' ? r.message : '';
+  }
+  render();
+}
+
 export function mount(el: HTMLElement) {
   root = el;
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
   root.addEventListener('pointerdown', onDragStart);
+  root.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if ((e.target as HTMLFormElement).dataset.form === 'contact') void submitContact();
+  });
+  window.addEventListener('hashchange', onRoute);
+  // Wieder online: Offline-Hinweis im Kontaktformular verschwindet, die Nachricht bleibt stehen
+  window.addEventListener('online', () => {
+    if (ui.contact.status === 'offline') {
+      ui.contact.status = 'idle';
+      render();
+    }
+  });
+  ui.route = routeFromHash(location.hash);
   render();
+  track(ui.route ? `/${ui.route}` : '/');
 }
 
 // ---------------------------------------------------------------- Ablauf
@@ -275,6 +382,16 @@ function onDragStart(e: PointerEvent) {
 
 function onInput(e: Event) {
   const t = e.target as HTMLInputElement;
+  if (t.form?.dataset.form === 'contact') {
+    const key = t.name as keyof ContactUi['fields'];
+    ui.contact.fields[key] = t.value;
+    if (ui.contact.status === 'ok') ui.contact.status = 'idle';
+    if (key === 'message') {
+      const counter = root.querySelector('[data-count]');
+      if (counter) counter.textContent = String(t.value.length);
+    }
+    return;
+  }
   const m = /^name(\d)$/.exec(t.name);
   if (m) ui.setup.names[Number(m[1])] = t.value;
 }
@@ -282,6 +399,7 @@ function onInput(e: Event) {
 function onClick(e: Event) {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
   if (!el || el.hasAttribute('disabled')) return;
+  if (el.tagName === 'A') e.preventDefault();
   unlockAudio();
   handle(el.dataset.act!, el.dataset.arg ?? '');
 }
@@ -316,11 +434,66 @@ function handle(action: string, arg: string) {
       return render();
     }
     case 'start':
+      if (needsAgeCheck(ui.setup.mode, store)) {
+        ui.ageDialog = { after: 'start' };
+        return render();
+      }
       sfx.turn();
       return newGame();
     case 'rematch':
+      if (needsAgeCheck(s!.settings.mode, store)) {
+        ui.ageDialog = { after: 'rematch' };
+        return render();
+      }
       sfx.turn();
       return startGame({ ...s!.settings });
+    case 'setMode':
+      sfx.tap();
+      if (arg === 'alkohol' && needsAgeCheck('alkohol', store)) {
+        ui.ageDialog = { after: 'mode' };
+        return render();
+      }
+      ui.setup.mode = arg as GameMode;
+      return render();
+    case 'ageOk': {
+      const after = ui.ageDialog?.after;
+      confirmAge(store);
+      ui.ageDialog = null;
+      if (after === 'rematch') return startGame({ ...s!.settings });
+      ui.setup.mode = 'alkohol';
+      if (after === 'start') return newGame();
+      return render();
+    }
+    case 'ageBack':
+      ui.ageDialog = null;
+      ui.setup.mode = 'klassisch';
+      if (s?.phase === 'spielende') {
+        game = null;
+        persist();
+      }
+      return render();
+    case 'ageReset':
+      resetAge(store);
+      if (ui.setup.mode === 'alkohol') ui.setup.mode = 'klassisch';
+      ui.sheet = null;
+      toast('Altersbestätigung zurückgesetzt.');
+      return render();
+    case 'stats': {
+      const before = statsChoice(store);
+      setStatsChoice(store, arg as StatsChoice);
+      if (before !== null) toast(arg === 'ja' ? 'Statistik eingeschaltet. Danke!' : 'Statistik ausgeschaltet.');
+      render();
+      if (arg === 'ja') track(ui.route ? `/${ui.route}` : '/');
+      return;
+    }
+    case 'route':
+      ui.sheet = null;
+      return openRoute(arg as Route);
+    case 'back':
+      return closeRoute();
+    case 'mail':
+      location.href = `mailto:${LEGAL.email.user}@${LEGAL.email.domain}`;
+      return;
     case 'toSetup':
       game = null;
       persist();
@@ -477,13 +650,17 @@ function assignSplit(s: GameState, id: number) {
 function render() {
   const s = game?.state;
   let html: string;
-  if (!s) html = setupScreen();
+  root.className = `mode-${currentMode()}`;
+  if (ui.route) html = pageScreen(ui.route);
+  else if (!s) html = setupScreen();
   else if (s.phase === 'rundenstart') html = introScreen(s);
   else if (s.phase === 'rundenende') html = endScreen(s);
   else if (s.phase === 'spielende') html = winnerScreen(s);
   else html = boardScreen(s);
-  html += overlay();
+  // Spiel-Einblendungen nur im Spiel, nicht über Impressum & Co.
+  if (!ui.route) html += overlay();
   html += sheet();
+  html += legalDialogs();
   if (ui.toast) html += `<div class="toast" role="status">${esc(ui.toast)}</div>`;
   root.innerHTML = html;
   runOverlayFx();
@@ -496,7 +673,7 @@ function topbar(s?: GameState) {
     <span class="topbar-btns">
       <button class="icon-btn" data-act="sound" aria-label="Ton ${isMuted() ? 'einschalten' : 'ausschalten'}">${speakerSvg(isMuted())}</button>
       <button class="icon-btn" data-act="sheet" data-arg="rules" aria-label="Regeln">?</button>
-      ${s ? `<button class="icon-btn" data-act="sheet" data-arg="menu" aria-label="Menü">≡</button>` : ''}
+      <button class="icon-btn" data-act="sheet" data-arg="menu" aria-label="Menü">≡</button>
     </span>
   </header>`;
 }
@@ -530,7 +707,16 @@ function setupScreen() {
   return `${topbar()}
   <main class="screen setup">
     <div class="logo"><span>LAST</span><span>CALL</span></div>
-    <p class="tagline">Schnaps oder Wasser? Nur das Handy weiß es.</p>
+    <p class="tagline">${T().bad} oder Wasser? Nur das Handy weiß es.</p>
+    <section class="panel">
+      <h3>Modus</h3>
+      <div class="modes">
+        <button class="mode-btn ${st.mode === 'klassisch' ? 'on' : ''}" data-act="setMode" data-arg="klassisch" aria-pressed="${st.mode === 'klassisch'}">
+          <b>KLASSISCH</b><small>Alkoholfrei: Zitrone &amp; Limo</small></button>
+        <button class="mode-btn ${st.mode === 'alkohol' ? 'on' : ''}" data-act="setMode" data-arg="alkohol" aria-pressed="${st.mode === 'alkohol'}">
+          <b>ALKOHOLMODUS</b><small>Schnaps &amp; Bier · ab 18</small></button>
+      </div>
+    </section>
     <section class="panel">
       <h3>Spieler (${n}/${MAX_PLAYERS})</h3>
       <p class="hint">Empfohlen: 3–4 Spieler. Reihenfolge = Sitzordnung am Tisch – zum Ändern an ≡ ziehen.</p>
@@ -552,8 +738,54 @@ function setupScreen() {
       ${toggle('barkeeper', 'Mit echtem Barkeeper', 'Eine weitere Person befüllt echte Gläser nach geheimer Anweisung')}
     </section>
     <button class="btn primary big" data-act="start">SPIEL STARTEN</button>
-    <p class="fineprint">Trinkt verantwortungsvoll. Nur für Erwachsene.</p>
+    <p class="fineprint">${st.mode === 'alkohol' ? 'Trinkt verantwortungsvoll. Nur für Erwachsene.' : 'Niemand muss mitmachen – spielt fair.'}</p>
+    ${footerLinks()}
   </main>`;
+}
+
+function footerLinks() {
+  return `<nav class="legal-links" aria-label="Rechtliches">
+    <a href="#/impressum" data-act="route" data-arg="impressum">Impressum</a>
+    <a href="#/datenschutz" data-act="route" data-arg="datenschutz">Datenschutz</a>
+    <a href="#/kontakt" data-act="route" data-arg="kontakt">Kontakt</a>
+  </nav>`;
+}
+
+function pageScreen(route: Route) {
+  const body = route === 'impressum' ? impressumHtml() : route === 'datenschutz' ? datenschutzHtml() : kontaktHtml(ui.contact);
+  return `${topbar(game?.state)}
+  <main class="screen page">
+    <button class="btn ghost back" data-act="back">← ZURÜCK</button>
+    <article class="legal">${body}</article>
+    ${footerLinks()}
+  </main>`;
+}
+
+/** Statistik-Frage (erster Start) und Altersabfrage (Alkoholmodus). */
+function legalDialogs() {
+  if (ui.ageDialog) {
+    return layer(
+      `<h2>NUR AB 18</h2>
+      <p>Dieser Modus enthält Alkohol. Bitte bestätigt, dass alle Mitspieler mindestens 18 Jahre alt sind.</p>
+      <button class="btn primary big" data-act="ageOk">Bestätigen</button>
+      <button class="btn big" data-act="ageBack">Zurück zum alkoholfreien Modus</button>`,
+      'legal-ov',
+    );
+  }
+  // Auf Datenschutz/Impressum/Kontakt erst lesen lassen, danach wieder fragen
+  if (needsStatsQuestion(store) && !ui.route) {
+    return layer(
+      `<h2>STATISTIK</h2>
+      <p>Darf die App anonyme Nutzungsstatistiken erfassen? Keine Cookies, keine persönlichen Daten.</p>
+      <div class="choice-row">
+        <button class="btn choice" data-act="stats" data-arg="ja">Ja</button>
+        <button class="btn choice" data-act="stats" data-arg="nein">Nein</button>
+      </div>
+      <p class="small"><a href="#/datenschutz" data-act="route" data-arg="datenschutz">Mehr in der Datenschutzerklärung</a></p>`,
+      'legal-ov',
+    );
+  }
+  return '';
 }
 
 function scoreboard(s: GameState) {
@@ -567,7 +799,7 @@ function scoreboard(s: GameState) {
       const pl = s.players[p];
       return `<div class="score ${isTurn(p) ? 'active' : ''} ${pl.out ? 'out' : ''}">
         <div class="score-name">${esc(pl.name)}${s.skipNext[p] ? '<em class="badge">SETZT AUS</em>' : ''}</div>
-        <div class="score-nums"><span title="Schnäpse">${shots(p)}${shotSvg()}</span><span title="Schlucke Bier"><b>${pl.sips}</b>${beerSvg()}</span></div>
+        <div class="score-nums"><span title="${T().bad}">${shots(p)}${shotSvg()}</span><span title="Schlucke Bier"><b>${pl.sips}</b>${beerSvg()}</span></div>
       </div>`;
     };
     return `<div class="scores">${card(0)}${card(1)}</div>${bk}`;
@@ -609,7 +841,7 @@ function scoreboard(s: GameState) {
 
 function announce(s: GameState) {
   return `<div class="announce">
-    <span class="a-schnaps">${s.announced.schnaps}× SCHNAPS</span>
+    <span class="a-schnaps">${s.announced.schnaps}× ${BAD()}</span>
     <span class="a-sep">·</span>
     <span class="a-wasser">${s.announced.wasser}× WASSER</span>
   </div>`;
@@ -679,8 +911,8 @@ function winnerScreen(s: GameState) {
 }
 
 function itemChip(owner: PlayerIndex, item: ItemId, small = false, iconOnly = false) {
-  return `<button class="item-chip ${small ? 'small' : ''} ${iconOnly ? 'icon-only' : ''}" data-act="item" data-arg="${owner}:${item}" aria-label="${ITEMS[item].name}">
-    ${itemIcon(item)}${iconOnly ? '' : `<span>${ITEMS[item].name}</span>`}</button>`;
+  return `<button class="item-chip ${small ? 'small' : ''} ${iconOnly ? 'icon-only' : ''}" data-act="item" data-arg="${owner}:${item}" aria-label="${iName(item)}">
+    ${itemIcon(item)}${iconOnly ? '' : `<span>${iName(item)}</span>`}</button>`;
 }
 
 function splitBanner(s: GameState) {
@@ -713,7 +945,7 @@ function boardScreen(s: GameState) {
     banner = splitBanner(s);
   } else if (ui.mode) {
     const what =
-      ui.mode.item === 'doppelter' ? 'Wähle zwei Gläser' : `Wähle ein Glas für ${ITEMS[ui.mode.item].name}`;
+      ui.mode.item === 'doppelter' ? 'Wähle zwei Gläser' : `Wähle ein Glas für ${iName(ui.mode.item)}`;
     banner = `<div class="banner mode"><b>${what}</b><button class="btn ghost" data-act="cancel">ABBRECHEN</button></div>`;
   } else if (s.forcedGlass !== null) {
     banner = `<div class="banner"><b>Glas ${glassNo(s.forcedGlass)} muss genommen werden</b></div>`;
@@ -820,15 +1052,15 @@ function overlay(): string {
       return layer(`
         <div class="ov-icon">${itemIcon('schutzengel')}</div>
         <h2>${nameOf(s, p)}, SCHUTZENGEL?</h2>
-        <p>Glas ${glassNo(s.pending[0].glassId)} ist Schnaps. Du darfst stattdessen einen Schluck Wasser trinken.</p>
+        <p>Glas ${glassNo(s.pending[0].glassId)} ist ${T().bad}. Du darfst stattdessen einen Schluck Wasser trinken.</p>
         <button class="btn primary big" data-act="angel" data-arg="ja">SCHUTZENGEL NUTZEN</button>
-        <button class="btn danger big" data-act="angel" data-arg="nein">ICH TRINKE DEN SCHNAPS</button>`, 'angel');
+        <button class="btn danger big" data-act="angel" data-arg="nein">ICH TRINKE ${currentMode() === 'alkohol' ? 'DEN' : 'DIE'} ${BAD()}</button>`, 'angel');
     }
     if (s.beerPick) {
       return layer(`
         <div class="ov-icon">${itemIcon('wuerfelbecher')}</div>
         <h2>${nameOf(s, s.current)}, WER TRINKT?</h2>
-        <p>Wähle, wer einen Schluck Bier nehmen muss.</p>
+        <p>Wähle, wer einen Schluck ${T().sip} nehmen muss.</p>
         ${playerButtons(s, opponents(s))}`);
     }
     return '';
@@ -862,7 +1094,7 @@ function overlay(): string {
     case 'reveal': {
       const schnaps = e.glasses.filter((g) => g.content === 'schnaps').length;
       const single = e.glasses.length === 1;
-      const head = single ? (schnaps ? 'SCHNAPS!' : 'WASSER') : `${schnaps}× SCHNAPS · ${e.glasses.length - schnaps}× WASSER`;
+      const head = single ? (schnaps ? `${BAD()}!` : 'WASSER') : `${schnaps}× ${BAD()} · ${e.glasses.length - schnaps}× WASSER`;
       const who =
         e.drinker === 'niemand'
           ? 'Wird weggekippt.'
@@ -888,7 +1120,7 @@ function overlay(): string {
         <p>${nameOf(s, e.player)} hat selbst getrunken – und es war Wasser.</p>
         ${
           e.item
-            ? `<div class="ov-icon">${itemIcon(e.item)}</div><p>Extra-Item: <b>${ITEMS[e.item].name}</b></p>`
+            ? `<div class="ov-icon">${itemIcon(e.item)}</div><p>Extra-Item: <b>${iName(e.item)}</b></p>`
             : s.settings.items
               ? '<p class="muted">Kein Platz mehr für ein Extra-Item.</p>'
               : `<p><b>${nameOf(s, e.player)} ist nochmal dran.</b></p>`
@@ -904,7 +1136,7 @@ function overlay(): string {
     case 'protected':
       return layer(
         `<div class="ov-icon">${itemIcon('schutzengel')}</div>
-        <h2>SCHUTZENGEL</h2><p>${nameOf(s, e.player)} trinkt statt des Schnapses einen Schluck Wasser.</p>${cont()}`,
+        <h2>SCHUTZENGEL</h2><p>${nameOf(s, e.player)} trinkt statt des ${T().badGen} einen Schluck Wasser.</p>${cont()}`,
         'angel',
       );
     case 'out':
@@ -944,7 +1176,7 @@ function overlay(): string {
       const effect: Record<ItemId, string> = {
         spuernase: `${me} riecht heimlich an Glas ${g}.`,
         langfinger: '',
-        bierpause: `${me}: einen echten Schluck Bier trinken! Danach wird Glas ${g} aufgedeckt und weggekippt.`,
+        bierpause: `${me}: einen echten Schluck ${T().sip} trinken! Danach wird Glas ${g} aufgedeckt und weggekippt.`,
         doppelter: `Zwei Gläser auf einmal: ${g}.`,
         aussetzer: `${tName} setzt den nächsten Zug aus.`,
         abraeumer: `Glas ${g} wird abgeräumt.`,
@@ -958,8 +1190,8 @@ function overlay(): string {
       };
       const head =
         e.stolen && victim !== null && victim !== undefined
-          ? `${me} KLAUT ${nameOf(s, victim)}: ${ITEMS[e.item].name}`
-          : `${me}: ${ITEMS[e.item].name}`;
+          ? `${me} KLAUT ${nameOf(s, victim)}: ${iName(e.item)}`
+          : `${me}: ${iName(e.item)}`;
       return layer(
         `<div class="ov-icon">${itemIcon(e.item)}</div><h2>${head.toUpperCase()}</h2>
         <p>${effect[e.item]}</p>${cont()}`,
@@ -973,8 +1205,8 @@ function overlay(): string {
           <h1 class="big-title">${e.value}</h1>
           <p>${
             e.player === null
-              ? `<b>${nameOf(s, s.current)}</b> darf wählen, wer einen Schluck Bier trinkt!`
-              : `<b>${nameOf(s, e.player)}</b> trinkt einen Schluck Bier!`
+              ? `<b>${nameOf(s, s.current)}</b> darf wählen, wer einen Schluck ${T().sip} trinkt!`
+              : `<b>${nameOf(s, e.player)}</b> trinkt einen Schluck ${T().sip}!`
           }</p>
           ${cont()}
         </div>`,
@@ -1052,12 +1284,19 @@ function sheet(): string {
     `<div class="scrim" data-act="close"></div><div class="sheet ${cls}" role="dialog" aria-modal="true">${inner}</div>`;
   switch (sh.kind) {
     case 'rules':
-      return wrapSheet(`${rulesHtml()}<button class="btn primary" data-act="close">VERSTANDEN</button>`, 'tall rules');
+      return wrapSheet(`${rulesHtml(currentMode())}<button class="btn primary" data-act="close">VERSTANDEN</button>`, 'tall rules');
     case 'menu':
       return wrapSheet(`<h3>Menü</h3>
         <button class="btn" data-act="sheet" data-arg="rules">REGELN</button>
         <button class="btn" data-act="sound">TON: ${isMuted() ? 'AUS' : 'AN'}</button>
-        <button class="btn danger" data-act="sheet" data-arg="confirmNew">NEUES SPIEL</button>
+        <button class="btn" data-act="stats" data-arg="${statsChoice(store) === 'ja' ? 'nein' : 'ja'}">STATISTIK: ${statsChoice(store) === 'ja' ? 'AN' : 'AUS'}</button>
+        ${ageConfirmed(store) ? '<button class="btn" data-act="ageReset">ALTERSBESTÄTIGUNG ZURÜCKSETZEN</button>' : ''}
+        <div class="menu-links">
+          <a href="#/impressum" data-act="route" data-arg="impressum">Impressum</a>
+          <a href="#/datenschutz" data-act="route" data-arg="datenschutz">Datenschutz</a>
+          <a href="#/kontakt" data-act="route" data-arg="kontakt">Kontakt</a>
+        </div>
+        ${s && !ui.route ? '<button class="btn danger" data-act="sheet" data-arg="confirmNew">NEUES SPIEL</button>' : ''}
         <button class="btn ghost" data-act="close">ZURÜCK</button>`);
     case 'confirmNew':
       return wrapSheet(`<h3>Wirklich neu starten?</h3><p>Der aktuelle Spielstand geht verloren.</p>
@@ -1072,7 +1311,7 @@ function sheet(): string {
           <button class="btn ghost" data-act="close">ZURÜCK</button>`, 'secret-ov');
       }
       return layer(`<h2>SO BEFÜLLEN</h2>
-        <ol class="fill-list">${s.glasses.map((g) => `<li class="${g.content}"><b>Glas ${glassNo(g.id)}</b> ${g.content === 'schnaps' ? 'SCHNAPS' : 'WASSER'}</li>`).join('')}</ol>
+        <ol class="fill-list">${s.glasses.map((g) => `<li class="${g.content}"><b>Glas ${glassNo(g.id)}</b> ${g.content === 'schnaps' ? BAD() : 'WASSER'}</li>`).join('')}</ol>
         <button class="btn primary big" data-act="barkeeperDone">FERTIG – VERDECKEN</button>`, 'secret-ov open');
     }
     case 'pick': {
@@ -1082,7 +1321,7 @@ function sheet(): string {
         doppelter: `Wer bekommt beide Gläser?`,
         aussetzer: 'Wer setzt den nächsten Zug aus?',
         langfinger: 'Wem klaust du ein Item?',
-        beer: 'Wer trinkt den Schluck Bier?',
+        beer: `Wer trinkt den Schluck ${T().sip}?`,
       };
       let list = opponents(s);
       if (sh.purpose === 'aussetzer') list = list.filter((p) => !s.skipNext[p]);
@@ -1095,17 +1334,16 @@ function sheet(): string {
       const loot = stealable(s, sh.from);
       return wrapSheet(`<h3>Was klaust du ${nameOf(s, sh.from)}?</h3>
         <div class="steal-list">${loot
-          .map((it) => `<button class="btn item-btn" data-act="steal" data-arg="${it}">${itemIcon(it)}<span><b>${ITEMS[it].name}</b><small>${ITEMS[it].short}</small></span></button>`)
+          .map((it) => `<button class="btn item-btn" data-act="steal" data-arg="${it}">${itemIcon(it)}<span><b>${iName(it)}</b><small>${iText(it)}</small></span></button>`)
           .join('')}</div>
         <button class="btn ghost" data-act="close">ABBRECHEN</button>`);
     }
     case 'item': {
       if (!s) return '';
-      const info = ITEMS[sh.item];
       const mine = sh.owner === s.current && s.phase === 'zug';
       const why = mine ? blockReason(s, sh.item) : null;
       return wrapSheet(`<div class="ov-icon">${itemIcon(sh.item)}</div>
-        <h3>${info.name}</h3><p>${info.short}</p>
+        <h3>${iName(sh.item)}</h3><p>${iText(sh.item)}</p>
         ${
           mine
             ? `<button class="btn primary big" data-act="useItem" data-arg="${sh.item}" ${why ? 'disabled' : ''}>EINSETZEN</button>${why ? `<p class="muted small">${why}</p>` : ''}`

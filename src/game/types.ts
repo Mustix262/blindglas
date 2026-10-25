@@ -5,6 +5,8 @@ export type PlayerIndex = number;
 export type Target = 'selbst' | 'gegner' | PlayerIndex;
 /** Spielrichtung: 1 = im Uhrzeigersinn (Sitzreihenfolge), −1 = andersherum. */
 export type Direction = 1 | -1;
+/** 'klassisch' = alkoholfrei, 'alkohol' = mit Schnaps & Bier (nur ab 18). */
+export type GameMode = 'klassisch' | 'alkohol';
 
 export type ItemId =
   | 'spuernase'
@@ -43,6 +45,7 @@ export interface Player {
 }
 
 export interface Settings {
+  mode: GameMode;
   /** 2–6 Namen in Sitzreihenfolge. */
   names: string[];
   /** 2–12 oder 'zufall' (jede Runde neu ausgewürfelt). */
