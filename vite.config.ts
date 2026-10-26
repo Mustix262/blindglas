@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 import { findPlaceholders, LEGAL } from './src/config/legal.ts';
+import { SITE, SITE_URL } from './src/config/site.ts';
 
 // Auf GitHub Pages liegt die App unter /<repo-name>/ – der Workflow setzt BASE_PATH.
 const base = process.env.BASE_PATH ?? '/';
@@ -48,11 +49,49 @@ const legalPlaceholders = (): Plugin => ({
   },
 });
 
+/**
+ * Link-Vorschau (WhatsApp, Instagram & Co.) und Suchmaschinen:
+ * Open-Graph-/Twitter-Tags, kanonische Adresse, robots.txt und sitemap.xml.
+ */
+const seo = (): Plugin => ({
+  name: 'last-call-seo',
+  transformIndexHtml: (html) => {
+    const image = new URL(SITE.image, SITE_URL).href;
+    const tags = [
+      `<link rel="canonical" href="${SITE_URL}" />`,
+      `<meta property="og:type" content="website" />`,
+      `<meta property="og:site_name" content="Last Call" />`,
+      `<meta property="og:locale" content="de_DE" />`,
+      `<meta property="og:title" content="${SITE.title}" />`,
+      `<meta property="og:description" content="${SITE.description}" />`,
+      `<meta property="og:url" content="${SITE_URL}" />`,
+      `<meta property="og:image" content="${image}" />`,
+      `<meta property="og:image:width" content="1200" />`,
+      `<meta property="og:image:height" content="630" />`,
+      `<meta property="og:image:alt" content="${SITE.imageAlt}" />`,
+      `<meta name="twitter:card" content="summary_large_image" />`,
+    ];
+    return html
+      .replace(/<title>.*<\/title>/, `<title>${SITE.title}</title>`)
+      .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${SITE.description}" />`)
+      .replace('</head>', `    ${tags.join('\n    ')}\n  </head>`);
+  },
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'robots.txt', source: `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}sitemap.xml\n` });
+    this.emitFile({
+      type: 'asset',
+      fileName: 'sitemap.xml',
+      source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE_URL}</loc></url>\n</urlset>\n`,
+    });
+  },
+});
+
 export default defineConfig({
   base,
   plugins: [
     csp(),
     legalPlaceholders(),
+    seo(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false,

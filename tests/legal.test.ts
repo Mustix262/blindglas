@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { scanMarkup, scanText } from '../scripts/external-urls.ts';
+import { siteHost } from '../src/config/site';
 import { findPlaceholders, formspreeEndpoint, goatcounterEndpoint, LEGAL } from '../src/config/legal';
 import {
   ageConfirmed,
@@ -250,6 +251,12 @@ describe('Externe URLs', () => {
     expect(f.filter((x) => !x.allowed).map((x) => x.host)).toEqual(['cdn.example.com', 'fonts.googleapis.com']);
   });
 
+  it('Verweise auf die eigene Website sind erlaubt, fremde nicht', () => {
+    const html = '<link rel="canonical" href="https://mustix262.github.io/last-call/" /><link href="https://evil.example/x.css">';
+    const f = scanMarkup('i.html', html, ['mustix262.github.io']);
+    expect(f.map((x) => [x.host, x.allowed])).toEqual([['mustix262.github.io', true], ['evil.example', false]]);
+  });
+
   it('HTML/CSS dürfen keine externen Ressourcen einbinden', () => {
     expect(scanMarkup('i.html', '<link href="https://fonts.googleapis.com/x" rel="stylesheet">')).toHaveLength(1);
     expect(scanMarkup('s.css', '@font-face{src:url(https://x.org/f.woff2)}')).toHaveLength(1);
@@ -262,7 +269,7 @@ describe('Externe URLs', () => {
     const files = walk('dist').filter((f) => /\.(html|css|js|webmanifest)$/.test(f));
     const bad = files.flatMap((f) => {
       const t = readFileSync(f, 'utf8');
-      return [...scanText(f, t), ...(/\.(html|css)$/.test(f) ? scanMarkup(f, t) : [])].filter((x) => !x.allowed);
+      return [...scanText(f, t, [siteHost()]), ...(/\.(html|css)$/.test(f) ? scanMarkup(f, t, [siteHost()]) : [])].filter((x) => !x.allowed);
     });
     expect(bad).toEqual([]);
   });

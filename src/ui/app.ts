@@ -496,6 +496,9 @@ function handle(action: string, arg: string) {
     case 'mail':
       location.href = `mailto:${LEGAL.email.user}@${LEGAL.email.domain}`;
       return;
+    case 'share':
+      ui.sheet = null;
+      return void shareApp();
     case 'toSetup':
       game = null;
       persist();
@@ -741,9 +744,33 @@ function setupScreen() {
     </section>
     <button class="btn primary big" data-act="start">SPIEL STARTEN</button>
     <p class="fineprint">${st.mode === 'alkohol' ? 'Trinkt verantwortungsvoll. Nur für Erwachsene.' : 'Niemand muss mitmachen – spielt fair.'}</p>
+    ${shareButton()}
     ${footerLinks()}
   </main>`;
 }
+
+/** Teilen über das System-Menü (iPhone: WhatsApp, Nachrichten …), sonst Link kopieren. */
+async function shareApp() {
+  const url = new URL(import.meta.env.BASE_URL, location.origin).href;
+  const data = { title: 'Last Call', text: 'Partyspiel fürs Handy – spielen wir eine Runde?', url };
+  if (navigator.share) {
+    try {
+      await navigator.share(data);
+      return;
+    } catch (e) {
+      if ((e as DOMException).name === 'AbortError') return; // abgebrochen
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Link kopiert – jetzt einfach einfügen und verschicken.');
+  } catch {
+    toast(url);
+  }
+  render();
+}
+
+const shareButton = () => `<button class="btn share" data-act="share">APP TEILEN</button>`;
 
 function footerLinks() {
   return `<nav class="legal-links" aria-label="Rechtliches">
@@ -909,6 +936,7 @@ function winnerScreen(s: GameState) {
     <ol class="ranking">${ranking}</ol>
     <button class="btn primary big" data-act="rematch">NOCHMAL MIT DENSELBEN</button>
     <button class="btn" data-act="toSetup">ZUM SETUP</button>
+    ${shareButton()}
   </main>`;
 }
 
@@ -1290,6 +1318,7 @@ function sheet(): string {
     case 'menu':
       return wrapSheet(`<h3>Menü</h3>
         <button class="btn" data-act="sheet" data-arg="rules">REGELN</button>
+        ${shareButton()}
         <button class="btn" data-act="sound">TON: ${isMuted() ? 'AUS' : 'AN'}</button>
         ${statsConfigured() ? `<button class="btn" data-act="stats" data-arg="${statsChoice(store) === 'ja' ? 'nein' : 'ja'}">STATISTIK: ${statsChoice(store) === 'ja' ? 'AN' : 'AUS'}</button>` : ''}
         ${ageConfirmed(store) ? '<button class="btn" data-act="ageReset">ALTERSBESTÄTIGUNG ZURÜCKSETZEN</button>' : ''}

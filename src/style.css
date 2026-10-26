@@ -388,6 +388,7 @@ p { margin: 0.4em 0; }
 .seat { font-family: var(--pixel); font-size: 10px; color: var(--muted); width: 14px; text-align: center; }
 .remove { flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); color: var(--red-hot); font-size: 24px; }
 .btn.add { min-height: 48px; color: var(--green); border-style: dashed; border-color: var(--green-dim); }
+.btn.share { color: var(--green); border-color: var(--green-dim); }
 
 /* ---------- Mehrspieler: Übersicht ---------- */
 .dirbar { display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--pixel); font-size: 8px; color: var(--green); }

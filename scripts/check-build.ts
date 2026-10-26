@@ -2,6 +2,7 @@
 // Aufruf: node scripts/check-build.ts  (läuft automatisch nach `npm run build`)
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { siteHost } from '../src/config/site.ts';
 import { scanMarkup, scanText, type Finding } from './external-urls.ts';
 
 const DIST = 'dist';
@@ -18,8 +19,8 @@ const findings: Finding[] = [];
 for (const file of walk(DIST).filter((f) => TEXT_FILES.test(f))) {
   const text = readFileSync(file, 'utf8');
   const rel = relative(DIST, file);
-  findings.push(...scanText(rel, text));
-  if (/\.(html|css)$/.test(file)) findings.push(...scanMarkup(rel, text));
+  findings.push(...scanText(rel, text, [siteHost()]));
+  if (/\.(html|css)$/.test(file)) findings.push(...scanMarkup(rel, text, [siteHost()]));
 }
 
 const bad = findings.filter((f) => !f.allowed);

@@ -82,6 +82,69 @@ function png(size, pad) {
   ]);
 }
 
+/** PNG aus einer Pixelfunktion (x, y) → [r, g, b]. */
+function encode(width, height, pixel) {
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (width * 3 + 1)] = 0;
+    for (let x = 0; x < width; x++) raw.set(pixel(x, y), y * (width * 3 + 1) + 1 + x * 3);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+// Eigene 5×7-Pixelschrift, nur die Buchstaben für „LAST CALL“
+const FONT = {
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  C: ['.####', '#....', '#....', '#....', '#....', '#....', '.####'],
+};
+
+/** Vorschaubild für geteilte Links (Open Graph, 1200×630). */
+function ogImage() {
+  const W = 1200;
+  const H = 630;
+  const glass = { x: 120, y: 139, s: 22 };
+  const text = { x: 560, s: 20, gap: 20 };
+  const words = [
+    { word: 'LAST', y: 150, color: COLORS['#'] },
+    { word: 'CALL', y: 340, color: COLORS.r },
+  ];
+  return encode(W, H, (x, y) => {
+    // Glas
+    const gx = Math.floor((x - glass.x) / glass.s);
+    const gy = Math.floor((y - glass.y) / glass.s);
+    const ch = ART[gy]?.[gx];
+    if (ch && ch !== '.' && x >= glass.x && y >= glass.y) return COLORS[ch];
+    // Schriftzug
+    for (const { word, y: wy, color } of words) {
+      const ly = Math.floor((y - wy) / text.s);
+      if (y < wy || ly > 6) continue;
+      const step = 5 * text.s + text.gap;
+      const li = Math.floor((x - text.x) / step);
+      const lx = Math.floor(((x - text.x) % step) / text.s);
+      if (x >= text.x && li < word.length && lx < 5 && FONT[word[li]][ly][lx] === '#') return color;
+    }
+    // dunkler Hintergrund mit rotem Schein links und grünem unten
+    const d = Math.hypot((x - 300) / W, (y - 315) / H);
+    const red = Math.max(0, 0.45 - d) * 1.4;
+    const green = Math.max(0, 0.5 - Math.hypot((x - 600) / W, (y - 700) / H)) * 0.5;
+    return [Math.min(255, 7 + 190 * red), Math.min(255, 5 + 10 * red + 120 * green), Math.min(255, 6 + 30 * red + 60 * green)];
+  });
+}
+
+writeFileSync('public/og-image.png', ogImage());
 writeFileSync('public/apple-touch-icon.png', png(180, 1));
 writeFileSync('public/icon-192.png', png(192, 1));
 writeFileSync('public/icon-512.png', png(512, 1));
