@@ -3,7 +3,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { findPlaceholders, LEGAL } from './src/config/legal.ts';
 import { SITE, SITE_URL } from './src/config/site.ts';
 
-// Auf GitHub Pages liegt die App unter /<repo-name>/ – der Workflow setzt BASE_PATH.
+// Die App liegt im Stammverzeichnis der eigenen Domain (https://blindglas.com/).
+// Nur falls sie wieder in einem Unterordner laufen soll: BASE_PATH setzen, z. B. "/last-call/".
 const base = process.env.BASE_PATH ?? '/';
 
 /**

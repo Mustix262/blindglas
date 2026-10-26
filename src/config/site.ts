@@ -1,8 +1,8 @@
 /**
  * Öffentliche Adresse der Website – für Link-Vorschau, Suchmaschinen und die URL-Prüfung im Build.
- * Mit eigener Domain hier z. B. 'https://blindglas.de/' eintragen (mit Schrägstrich am Ende).
+ * Eigene Domain (DNS bei Namecheap → GitHub Pages). Immer mit Schrägstrich am Ende.
  */
-export const SITE_URL = 'https://mustix262.github.io/last-call/';
+export const SITE_URL = 'https://blindglas.com/';
 
 export const SITE = {
   title: 'Blindglas – Partyspiel fürs Handy',

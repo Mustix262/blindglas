@@ -39,13 +39,22 @@ npm run icons    # App-Icons neu erzeugen
    git push -u origin main
    ```
 3. Im Repository: **Settings → Pages → Build and deployment → Source: „GitHub Actions“**.
-4. Unter **Actions** läuft der Workflow „Deploy auf GitHub Pages“ (Tests → Build → Deploy). Danach ist die App erreichbar unter `https://<dein-name>.github.io/last-call/`.
+4. Unter **Actions** läuft der Workflow „Deploy auf GitHub Pages“ (Tests → Build → Deploy).
 
 Jeder weitere Push auf `main` veröffentlicht automatisch eine neue Version. Die installierte App holt sich das Update beim nächsten Öffnen mit Internet.
 
+### Eigene Domain
+
+Die App läuft unter **https://blindglas.com/** (Stammverzeichnis, Basis-Pfad `/`).
+
+- DNS bei Namecheap: 4 × A auf `185.199.108–111.153`, 4 × AAAA auf `2606:50c0:8000–8003::153`, `www` als CNAME auf `mustix262.github.io`.
+- Die Domain ist in **Settings → Pages → Custom domain** eingetragen. Weil per GitHub Actions veröffentlicht wird, braucht es keine `CNAME`-Datei.
+- Die öffentliche Adresse für Link-Vorschau, Sitemap und URL-Prüfung steht in `src/config/site.ts`.
+- Die alte Adresse `mustix262.github.io/last-call/` leitet automatisch auf die Domain weiter.
+
 ## Aufs iPhone
 
-1. Die GitHub-Pages-Adresse in **Safari** öffnen.
+1. **https://blindglas.com** in **Safari** öffnen.
 2. Teilen-Symbol (Quadrat mit Pfeil) → **„Zum Home-Bildschirm“** → Hinzufügen.
 3. Blindglas einmal mit Internet starten – danach läuft es auch offline.
 
