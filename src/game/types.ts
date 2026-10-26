@@ -81,7 +81,8 @@ export interface GameState {
   direction: Direction;
   /** Anzahl beendeter Züge in dieser Runde. 0 = erster Zug. */
   turnNumber: number;
-  itemUsed: boolean;
+  /** Wie viele Items im aktuellen Zug schon eingesetzt wurden (höchstens MAX_ITEMS_PER_TURN). */
+  itemsUsed: number;
   /** skipNext[i]: Spieler i setzt seinen nächsten Zug aus. */
   skipNext: boolean[];
   /** Nach der Spürnase muss genau dieses Glas genommen werden. */

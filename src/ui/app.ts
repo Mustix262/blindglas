@@ -16,7 +16,7 @@ import {
   takeGlass,
 } from '../game/engine';
 import { itemName, itemText } from '../game/inventory';
-import { blockReason, chooseBeer, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
+import { MAX_ITEMS_PER_TURN, blockReason, chooseBeer, split, splitShare, stealable, useItem, type ItemRequest } from '../game/items';
 import { defaultRng } from '../game/rng';
 import { terms } from '../game/terms';
 import { RuleError, type GameEvent, type GameMode, type GameState, type ItemId, type PlayerIndex, type Result, type Settings } from '../game/types';
@@ -1011,7 +1011,7 @@ function boardScreen(s: GameState) {
     .join('');
   const tray = s.settings.items
     ? `<section class="tray ${compact ? 'compact' : ''}">
-        <h4>Deine Items</h4>
+        <h4>Deine Items <span class="items-left ${s.itemsUsed >= MAX_ITEMS_PER_TURN ? 'none' : ''}">· noch ${MAX_ITEMS_PER_TURN - s.itemsUsed} von ${MAX_ITEMS_PER_TURN} in diesem Zug</span></h4>
         <div class="item-row">${s.players[me].items.map((it) => itemChip(me, it)).join('') || '<small class="muted">keine</small>'}</div>
         ${otherItems}
       </section>`

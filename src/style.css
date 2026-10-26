@@ -230,6 +230,8 @@ p { margin: 0.4em 0; }
 /* ---------- Items ---------- */
 .tray { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px 10px 10px; }
 .tray h4 { margin-top: 6px; }
+.items-left { color: var(--green); font-family: var(--mono); font-size: 16px; letter-spacing: 0; }
+.items-left.none { color: var(--muted); }
 .tray h4.opp { margin-top: 12px; }
 .item-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .item-chip {

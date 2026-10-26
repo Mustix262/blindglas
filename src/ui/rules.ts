@@ -27,7 +27,7 @@ export function rulesHtml(mode: GameMode) {
     <li><b>Shot-Limit</b> (optional): Wer es erreicht, ist raus und wird ab dann übersprungen. Wer als Letzter übrig bleibt, gewinnt.</li>
   </ol>
   <h3>Items</h3>
-  <p>Jede Runde bekommen alle, die noch dabei sind, 2–4 zufällige Items (höchstens 8 auf der Hand). Pro Zug darf nur ein Item eingesetzt werden, danach ist es weg. Der Schutzengel ist die Ausnahme: Er wird automatisch angeboten, wenn du ${t.bad} trinken müsstest. Bei geheimen Infos zeigt die App vorher einen Übergabe-Bildschirm.</p>
+  <p>Jede Runde bekommen alle, die noch dabei sind, 2–4 zufällige Items (höchstens 8 auf der Hand). Pro Zug darfst du bis zu 3 Items einsetzen, jedes ist danach weg. Der Schutzengel ist die Ausnahme: Er wird automatisch angeboten, wenn du ${t.bad} trinken müsstest. Bei geheimen Infos zeigt die App vorher einen Übergabe-Bildschirm.</p>
   <ul class="rules-items">${items}</ul>
   <h3>Mit echtem Barkeeper</h3>
   <p>Eine weitere Person füllt echte Gläser nach geheimer Anweisung der App und füllt heimlich um, wenn ein Wendehals gespielt wird. Wird ein Glas abgeräumt, trinkt es der Barkeeper.</p>

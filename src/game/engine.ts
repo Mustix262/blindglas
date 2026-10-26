@@ -86,7 +86,7 @@ export function createGame(settings: Settings): GameState {
     current: 0,
     direction: 1,
     turnNumber: 0,
-    itemUsed: false,
+    itemsUsed: 0,
     skipNext: settings.names.map(() => false),
     forcedGlass: null,
     splitter: null,
@@ -122,7 +122,7 @@ export function startRound(prev: GameState, rng: Rng): Result {
   };
   s.phase = 'rundenstart';
   s.turnNumber = 0;
-  s.itemUsed = false;
+  s.itemsUsed = 0;
   s.skipNext = s.players.map(() => false);
   s.forcedGlass = null;
   s.splitter = null;
@@ -281,7 +281,7 @@ function continueWith(s: GameState, after: Continuation, rng: Rng, events: GameE
 
 function newTurn(s: GameState) {
   s.turnNumber += 1;
-  s.itemUsed = false;
+  s.itemsUsed = 0;
   s.forcedGlass = null;
 }
 

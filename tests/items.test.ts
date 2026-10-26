@@ -35,11 +35,43 @@ describe('Austeilen', () => {
 });
 
 describe('allgemeine Item-Regeln', () => {
-  it('nur ein Item pro Zug', () => {
-    let s = table(['schnaps', 'wasser', 'wasser'], { items: mine('aussetzer', 'wuerfelbecher') });
+  it('bis zu 3 Items pro Zug, das 4. ist gesperrt', () => {
+    let s = table(['schnaps', 'wasser', 'wasser'], {
+      items: mine('aussetzer', 'wuerfelbecher', 'wendehals', 'fluesterpost'),
+    });
     s = useItem(s, { item: 'aussetzer' }, rng()).state;
-    expect(blockReason(s, 'wuerfelbecher')).toBe('Nur ein Item pro Zug');
-    expect(() => useItem(s, { item: 'wuerfelbecher' }, rng())).toThrow(RuleError);
+    expect(blockReason(s, 'wuerfelbecher')).toBeNull();
+    s = useItem(s, { item: 'wuerfelbecher' }, fixedRng(0.9)).state;
+    s = useItem(s, { item: 'wendehals', glass: 1 }, rng()).state;
+    expect(s.itemsUsed).toBe(3);
+    expect(blockReason(s, 'fluesterpost')).toBe('Höchstens 3 Items pro Zug');
+    expect(() => useItem(s, { item: 'fluesterpost' }, rng())).toThrow(RuleError);
+    expect(s.current).toBe(0); // Zug läuft noch – Glas nehmen geht weiter
+    expect(takeGlass(s, 0, 'gegner', rng()).state.players[1].shots).toBe(1);
+  });
+
+  it('der Zähler startet im nächsten Zug wieder bei 0', () => {
+    let s = table(['schnaps', 'wasser', 'wasser', 'wasser'], {
+      items: [['wuerfelbecher', 'wuerfelbecher', 'wuerfelbecher'], ['wuerfelbecher']],
+    });
+    for (let i = 0; i < 3; i++) s = useItem(s, { item: 'wuerfelbecher' }, fixedRng(0.9)).state;
+    s = takeGlass(s, 1, 'gegner', rng()).state;
+    expect(s.current).toBe(1);
+    expect(s.itemsUsed).toBe(0);
+    expect(blockReason(s, 'wuerfelbecher')).toBeNull();
+  });
+
+  it('Langfinger zählt als ein Item, auch wenn er ein geklautes gleich einsetzt', () => {
+    let s = table(['schnaps', 'wasser', 'wasser'], { items: [['langfinger', 'wuerfelbecher'], ['aussetzer']] });
+    s = useItem(s, { item: 'langfinger', steal: { item: 'aussetzer' } }, rng()).state;
+    expect(s.itemsUsed).toBe(1);
+    expect(blockReason(s, 'wuerfelbecher')).toBeNull();
+  });
+
+  it('nach der Spürnase muss trotzdem sofort das Glas genommen werden', () => {
+    let s = table(['schnaps', 'wasser', 'wasser'], { items: mine('spuernase', 'wuerfelbecher') });
+    s = useItem(s, { item: 'spuernase', glass: 0 }, rng()).state;
+    expect(blockReason(s, 'wuerfelbecher')).toBe('Erst das gerochene Glas nehmen');
   });
 
   it('Items werden verbraucht', () => {

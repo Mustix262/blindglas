@@ -43,6 +43,9 @@ export type ItemRequest =
 /** Wem das Item gehört: dem aktuellen Spieler, dem einzigen Gegner oder einem bestimmten Mitspieler. */
 export type Source = 'selbst' | 'gegner' | PlayerIndex;
 
+/** So viele Items darf man pro Zug einsetzen. */
+export const MAX_ITEMS_PER_TURN = 3;
+
 const UNSTEALABLE: ItemId[] = ['langfinger', 'schutzengel'];
 
 function ownerOf(s: GameState, from: Source): PlayerIndex {
@@ -54,7 +57,7 @@ function ownerOf(s: GameState, from: Source): PlayerIndex {
 export function blockReason(s: GameState, item: ItemId, from: Source = 'selbst'): string | null {
   if (!s.settings.items) return 'Items sind aus';
   if (s.phase !== 'zug' || s.pending.length || s.splitter !== null || s.beerPick) return 'Gerade nicht möglich';
-  if (s.itemUsed) return 'Nur ein Item pro Zug';
+  if (s.itemsUsed >= MAX_ITEMS_PER_TURN) return `Höchstens ${MAX_ITEMS_PER_TURN} Items pro Zug`;
   if (s.forcedGlass !== null) return 'Erst das gerochene Glas nehmen';
   let owner: PlayerIndex;
   try {
@@ -139,7 +142,7 @@ export function useItem(prev: GameState, req: ItemRequest, rng: Rng): Result {
     ...(explicit && owner !== me ? { from: owner } : {}),
     ...(explicit && target !== undefined && target !== me ? { target } : {}),
   });
-  s.itemUsed = true;
+  s.itemsUsed += 1;
   apply(s, effect as Exclude<ItemRequest, { item: 'langfinger' }>, target, rng, events);
   return { state: s, events };
 }

@@ -36,8 +36,15 @@ function write(key: string, value: unknown) {
 
 /** Spielstände aus der 2-Spieler-Version (v1) übernehmen. */
 function migrate(state: Record<string, unknown> & { version: number }): GameState | null {
-  // Spiele von vor der Modus-Auswahl waren immer mit Schnaps & Bier
-  const withMode = (s: GameState) => ((s.settings.mode ??= 'alkohol'), s);
+  const withMode = (s: GameState) => {
+    // Spiele von vor der Modus-Auswahl waren immer mit Schnaps & Bier
+    s.settings.mode ??= 'alkohol';
+    // Früher galt „ein Item pro Zug“ als Ja/Nein-Wert, jetzt wird gezählt
+    const old = s as GameState & { itemUsed?: boolean };
+    if (typeof s.itemsUsed !== 'number') s.itemsUsed = old.itemUsed ? 1 : 0;
+    delete old.itemUsed;
+    return s;
+  };
   if (state.version === 2) return withMode(state as unknown as GameState);
   if (state.version !== 1) return null;
   const s = state as unknown as GameState;
