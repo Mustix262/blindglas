@@ -28,14 +28,14 @@ npm run icons    # App-Icons neu erzeugen
 
 ## Veröffentlichen auf GitHub Pages
 
-1. Neues Repository auf GitHub anlegen (z. B. `last-call`).
+1. Neues Repository auf GitHub anlegen (z. B. `blindglas`).
 2. Projekt hochladen:
    ```bash
    git init
    git add .
    git commit -m "Blindglas"
    git branch -M main
-   git remote add origin https://github.com/<dein-name>/last-call.git
+   git remote add origin https://github.com/<dein-name>/blindglas.git
    git push -u origin main
    ```
 3. Im Repository: **Settings → Pages → Build and deployment → Source: „GitHub Actions“**.
@@ -50,7 +50,7 @@ Die App läuft unter **https://blindglas.com/** (Stammverzeichnis, Basis-Pfad `/
 - DNS bei Namecheap: 4 × A auf `185.199.108–111.153`, 4 × AAAA auf `2606:50c0:8000–8003::153`, `www` als CNAME auf `mustix262.github.io`.
 - Die Domain ist in **Settings → Pages → Custom domain** eingetragen. Weil per GitHub Actions veröffentlicht wird, braucht es keine `CNAME`-Datei.
 - Die öffentliche Adresse für Link-Vorschau, Sitemap und URL-Prüfung steht in `src/config/site.ts`.
-- Die alte Adresse `mustix262.github.io/last-call/` leitet automatisch auf die Domain weiter.
+- Das Repository heißt `Mustix262/blindglas` (früher `last-call`; GitHub leitet alte Repo-Links weiter).
 
 ## Aufs iPhone
 
