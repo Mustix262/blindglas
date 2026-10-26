@@ -27,7 +27,7 @@ const CSP = [
 
 /** Setzt die CSP als <meta>-Tag – nur im Build, damit der Entwicklungsserver (Hot Reload) weiter läuft. */
 const csp = (): Plugin => ({
-  name: 'last-call-csp',
+  name: 'blindglas-csp',
   apply: 'build',
   transformIndexHtml: (html) =>
     html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
@@ -35,7 +35,7 @@ const csp = (): Plugin => ({
 
 /** Warnt deutlich, solange in src/config/legal.ts noch Platzhalter stehen. */
 const legalPlaceholders = (): Plugin => ({
-  name: 'last-call-legal-placeholders',
+  name: 'blindglas-legal-placeholders',
   apply: 'build',
   buildStart() {
     const open = findPlaceholders(LEGAL);
@@ -54,13 +54,13 @@ const legalPlaceholders = (): Plugin => ({
  * Open-Graph-/Twitter-Tags, kanonische Adresse, robots.txt und sitemap.xml.
  */
 const seo = (): Plugin => ({
-  name: 'last-call-seo',
+  name: 'blindglas-seo',
   transformIndexHtml: (html) => {
     const image = new URL(SITE.image, SITE_URL).href;
     const tags = [
       `<link rel="canonical" href="${SITE_URL}" />`,
       `<meta property="og:type" content="website" />`,
-      `<meta property="og:site_name" content="Last Call" />`,
+      `<meta property="og:site_name" content="Blindglas" />`,
       `<meta property="og:locale" content="de_DE" />`,
       `<meta property="og:title" content="${SITE.title}" />`,
       `<meta property="og:description" content="${SITE.description}" />`,
@@ -96,8 +96,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false,
       manifest: {
-        name: 'Last Call',
-        short_name: 'Last Call',
+        name: 'Blindglas',
+        short_name: 'Blindglas',
         description: 'Partyspiel für 2–6: Was ist im Glas? Nur das Handy weiß es.',
         lang: 'de',
         start_url: base,

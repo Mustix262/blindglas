@@ -10,7 +10,7 @@ export function rulesHtml(mode: GameMode) {
     (id) => `<li>${itemIcon(id)}<span><b>${itemName(id, mode)}</b> – ${itemText(id, mode)}</span></li>`,
   ).join('');
   return `
-  <h2>So läuft „Last Call“</h2>
+  <h2>So läuft „Blindglas“</h2>
   <p class="warn">${LIABILITY}</p>
   <h3>Zwei Modi</h3>
   <ul class="rules-list">

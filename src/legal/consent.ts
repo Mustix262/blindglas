@@ -11,6 +11,7 @@ export interface KeyValueStore {
   removeItem(key: string): void;
 }
 
+// Schlüssel stammen noch vom alten Namen „Last Call“ – bleiben so, damit Entscheidungen erhalten bleiben
 export const STATS_KEY = 'lastcall.stats.v1';
 export const AGE_KEY = 'lastcall.age18.v1';
 

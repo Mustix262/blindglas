@@ -1,5 +1,6 @@
 import type { GameEvent, GameState, Settings } from '../game/types';
 
+// Schlüssel stammen noch vom alten Namen „Last Call“ – bleiben so, damit gespeicherte Spiele erhalten bleiben
 const GAME_KEY = 'lastcall.game.v1';
 const PREFS_KEY = 'lastcall.prefs.v1';
 

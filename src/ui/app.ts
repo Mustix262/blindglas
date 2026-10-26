@@ -672,7 +672,7 @@ function render() {
 }
 
 function topbar(s?: GameState) {
-  const title = s ? `RUNDE ${s.round}` : 'LAST CALL';
+  const title = s ? `RUNDE ${s.round}` : 'BLINDGLAS';
   return `<header class="topbar">
     <span class="topbar-title">${title}</span>
     <span class="topbar-btns">
@@ -711,7 +711,7 @@ function setupScreen() {
     </button>`;
   return `${topbar()}
   <main class="screen setup">
-    <div class="logo"><span>LAST</span><span>CALL</span></div>
+    <div class="logo"><span>BLIND</span><span>GLAS</span></div>
     <p class="tagline">${T().bad} oder Wasser? Nur das Handy weiß es.</p>
     <section class="panel">
       <h3>Modus</h3>
@@ -752,7 +752,7 @@ function setupScreen() {
 /** Teilen über das System-Menü (iPhone: WhatsApp, Nachrichten …), sonst Link kopieren. */
 async function shareApp() {
   const url = new URL(import.meta.env.BASE_URL, location.origin).href;
-  const data = { title: 'Last Call', text: 'Partyspiel fürs Handy – spielen wir eine Runde?', url };
+  const data = { title: 'Blindglas', text: 'Partyspiel fürs Handy – spielen wir eine Runde?', url };
   if (navigator.share) {
     try {
       await navigator.share(data);

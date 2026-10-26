@@ -63,7 +63,7 @@ export async function sendContact(f: ContactFields, env: ContactEnv): Promise<Se
         name: f.name.trim(),
         email: f.email.trim(),
         message: f.message.trim(),
-        _subject: 'Last Call – Kontaktformular',
+        _subject: 'Blindglas – Kontaktformular',
       }),
     });
     if (res.ok) return { status: 'ok' };

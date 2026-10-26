@@ -102,13 +102,16 @@ function encode(width, height, pixel) {
   ]);
 }
 
-// Eigene 5×7-Pixelschrift, nur die Buchstaben für „LAST CALL“
+// Eigene 5×7-Pixelschrift, nur die Buchstaben für „BLINDGLAS“
 const FONT = {
+  B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
   L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  G: ['.####', '#....', '#....', '#.###', '#...#', '#...#', '.###.'],
   A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
   S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
-  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
-  C: ['.####', '#....', '#....', '#....', '#....', '#....', '.####'],
 };
 
 /** Vorschaubild für geteilte Links (Open Graph, 1200×630). */
@@ -116,10 +119,11 @@ function ogImage() {
   const W = 1200;
   const H = 630;
   const glass = { x: 120, y: 139, s: 22 };
-  const text = { x: 560, s: 20, gap: 20 };
+  // „BLIND“ hat fünf Buchstaben → etwas kleiner, damit es mit Rand ins Bild passt
+  const text = { x: 560, s: 18, gap: 18 };
   const words = [
-    { word: 'LAST', y: 150, color: COLORS['#'] },
-    { word: 'CALL', y: 340, color: COLORS.r },
+    { word: 'BLIND', y: 165, color: COLORS['#'] },
+    { word: 'GLAS', y: 340, color: COLORS.r },
   ];
   return encode(W, H, (x, y) => {
     // Glas

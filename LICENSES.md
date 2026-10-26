@@ -2,7 +2,7 @@
 
 ## Eigene Inhalte
 
-Alle Grafiken (Pixel-Icons für Gläser und Items, App-Icon), Animationen (CSS) und Soundeffekte (zur Laufzeit mit der Web Audio API erzeugt) wurden für „Last Call“ selbst erstellt. Es werden keine fremden Bild- oder Tondateien verwendet. Alle Regel- und Item-Texte sind eigene Formulierungen.
+Alle Grafiken (Pixel-Icons für Gläser und Items, App-Icon), Animationen (CSS) und Soundeffekte (zur Laufzeit mit der Web Audio API erzeugt) wurden für „Blindglas“ selbst erstellt. Es werden keine fremden Bild- oder Tondateien verwendet. Alle Regel- und Item-Texte sind eigene Formulierungen.
 
 ## Schriftarten (in der App mitgeliefert, nicht extern geladen)
 

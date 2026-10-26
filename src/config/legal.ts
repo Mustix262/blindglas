@@ -22,7 +22,7 @@ export const LEGAL: LegalConfig = {
   email: { user: 'm.demiral2', domain: 'icloud.com' },
   /** Formspree-Formular-ID, z. B. "xyzabcde" aus https://formspree.io/f/xyzabcde */
   formspreeId: 'mdeeeoyn',
-  /** GoatCounter-Code, z. B. "lastcall" für https://lastcall.goatcounter.com */
+  /** GoatCounter-Code, z. B. "mdemiral" für https://mdemiral.goatcounter.com */
   goatcounterCode: 'mdemiral',
   /** Für mich zuständige Datenschutz-Aufsichtsbehörde. */
   authority: {

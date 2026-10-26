@@ -39,7 +39,7 @@ const link = (route: Route, label: string) => `<a href="#/${route}" data-act="ro
 const ext = (url: string, label: string) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
 
 export const LIABILITY =
-  'Die Nutzung von „Last Call“ erfolgt auf eigene Verantwortung. Niemand muss mitspielen oder trinken – kein Gruppenzwang. Im Alkoholmodus gilt: verantwortungsvoll trinken, Wasser zwischendurch, und danach nie Auto fahren.';
+  'Die Nutzung von „Blindglas“ erfolgt auf eigene Verantwortung. Niemand muss mitspielen oder trinken – kein Gruppenzwang. Im Alkoholmodus gilt: verantwortungsvoll trinken, Wasser zwischendurch, und danach nie Auto fahren.';
 
 const address = () => `${esc(LEGAL.name)}<br>${esc(LEGAL.street)}<br>${esc(LEGAL.postalCity)}<br>${esc(LEGAL.country)}`;
 
@@ -61,7 +61,7 @@ export function datenschutzHtml(stats = statsConfigured()) {
   const n = (k: number) => (stats || k < 5 ? k : k - 1);
   return `
   <h1 class="page-title">Datenschutzerklärung</h1>
-  <p>Kurz gesagt: „Last Call“ läuft komplett auf deinem Gerät. Es gibt keine Konten, keine Cookies und keine Werbung. Daten verlassen dein Gerät nur beim Laden der Website${stats ? ', wenn du der anonymen Statistik zustimmst' : ''} oder wenn du mir über das Kontaktformular oder per E-Mail schreibst.</p>
+  <p>Kurz gesagt: „Blindglas“ läuft komplett auf deinem Gerät. Es gibt keine Konten, keine Cookies und keine Werbung. Daten verlassen dein Gerät nur beim Laden der Website${stats ? ', wenn du der anonymen Statistik zustimmst' : ''} oder wenn du mir über das Kontaktformular oder per E-Mail schreibst.</p>
 
   <h2>1. Verantwortlicher</h2>
   <p>${address()}<br>E-Mail: ${mailLink()}</p>

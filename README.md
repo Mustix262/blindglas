@@ -1,4 +1,4 @@
-# Last Call
+# Blindglas
 
 Ein Partyspiel für 2–6 Leute als Web-App fürs Handy: Das Handy füllt virtuelle Gläser – nur es weiß, welches was enthält. Zwei Modi: **Klassisch** (alkoholfrei, Zitrone & Limo) und **Alkoholmodus** (Schnaps & Bier, nur ab 18, mit Altersabfrage). Pass-and-Play reihum, optional mit Shot-Limit und Sieger. Läuft komplett offline, ohne Konten, ohne Cookies; Statistik nur mit Einwilligung.
 
@@ -33,7 +33,7 @@ npm run icons    # App-Icons neu erzeugen
    ```bash
    git init
    git add .
-   git commit -m "Last Call"
+   git commit -m "Blindglas"
    git branch -M main
    git remote add origin https://github.com/<dein-name>/last-call.git
    git push -u origin main
@@ -47,6 +47,6 @@ Jeder weitere Push auf `main` veröffentlicht automatisch eine neue Version. Die
 
 1. Die GitHub-Pages-Adresse in **Safari** öffnen.
 2. Teilen-Symbol (Quadrat mit Pfeil) → **„Zum Home-Bildschirm“** → Hinzufügen.
-3. Last Call einmal mit Internet starten – danach läuft es auch offline.
+3. Blindglas einmal mit Internet starten – danach läuft es auch offline.
 
 Lizenzen: siehe [LICENSES.md](LICENSES.md).
