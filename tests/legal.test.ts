@@ -24,8 +24,10 @@ describe('Konfiguration & Platzhalter', () => {
     expect(findPlaceholders({ a: 'Echter Wert' })).toEqual([]);
   });
 
-  it('meldet aktuell nur den GoatCounter-Code als offen', () => {
-    expect(findPlaceholders(LEGAL)).toEqual(['goatcounterCode']);
+  it('alle Angaben sind eingetragen (keine Platzhalter mehr)', () => {
+    expect(findPlaceholders(LEGAL)).toEqual([]);
+    expect(LEGAL.formspreeId).toBe('mdeeeoyn');
+    expect(LEGAL.goatcounterCode).toBe('mdemiral');
   });
 
   it('enthält die Impressumsangaben', () => {
@@ -114,6 +116,8 @@ describe('Statistik nur mit Einwilligung', () => {
     expect(datenschutzHtml(false)).toContain('6. Deine Rechte');
     expect(datenschutzHtml(true)).toContain('5. Anonyme Besucherstatistik (GoatCounter)');
     expect(datenschutzHtml(true)).toContain('7. Deine Rechte');
+    expect(datenschutzHtml(true)).toContain('9. Änderungen');
+    expect(datenschutzHtml(false)).toContain('8. Änderungen');
   });
 
   it('übersteht einen kaputten Speicher', () => {

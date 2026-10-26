@@ -8,7 +8,12 @@
  * - Formspree: NICHT in der Liste; die Formspree-Datenschutzerklärung nennt weder DPF noch
  *   Standardvertragsklauseln. Deshalb holt das Kontaktformular vor dem Absenden eine ausdrückliche
  *   Einwilligung in die Übermittlung ein (Art. 49 Abs. 1 lit. a DSGVO).
- * - GoatCounter: Angaben (Betreiber, Serverstandort, Umgang mit IP-Adressen) noch selbst prüfen.
+ * - GoatCounter (Code "mdemiral"): DNS zeigt auf 65.21.71.180 / 2a01:4f9:… (Adressbereich von Hetzner,
+ *   Finnland) – also vermutlich EU. Betreiber und Umgang mit IP-Adressen beim Anbieter bestätigen.
+ * - Abgleich mit datenschutz-generator.de (26.10.2026): Pflichtthemen sind abgedeckt. Übernommen
+ *   (in eigenen Worten): HTTPS, Änderungen, ausführliches Widerspruchsrecht. Bewusst NICHT
+ *   übernommen, weil für diese App falsch: Standardvertragsklauseln mit allen US-Anbietern,
+ *   Cookies/Consent-Management, Nutzerprofile und IP-Masking bei der Reichweitenmessung.
  */
 import { LEGAL } from '../config/legal';
 import { MAX_MESSAGE, type ContactErrors, type ContactFields } from '../legal/contact';
@@ -80,7 +85,14 @@ export function datenschutzHtml(stats = statsConfigured()) {
 
   <h2>${n(7)}. Deine Rechte</h2>
   <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen (Art. 21). Eine erteilte Einwilligung kannst du jederzeit widerrufen (Art. 7 Abs. 3). Wende dich dafür einfach an mich (siehe oben).</p>
-  <p>Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für mich zuständig ist: ${esc(LEGAL.authority.name)}, ${esc(LEGAL.authority.address)}, ${ext(LEGAL.authority.url, 'www.lda.bayern.de')}.</p>
+  <p><b>Widerspruchsrecht:</b> Verarbeite ich Daten auf Grundlage meines berechtigten Interesses (Art. 6 Abs. 1 lit. f DSGVO), kannst du aus Gründen, die sich aus deiner besonderen Situation ergeben, jederzeit widersprechen. Ich verarbeite die Daten dann nicht mehr, es sei denn, es gibt zwingende schutzwürdige Gründe, die deine Interessen überwiegen, oder die Verarbeitung dient der Durchsetzung oder Abwehr von Rechtsansprüchen.</p>
+  <p>Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), insbesondere in dem EU-Land, in dem du wohnst oder arbeitest. Für mich zuständig ist: ${esc(LEGAL.authority.name)}, ${esc(LEGAL.authority.address)}, ${ext(LEGAL.authority.url, 'www.lda.bayern.de')}.</p>
+
+  <h2>${n(8)}. Sicherheit</h2>
+  <p>Die Website wird ausschließlich verschlüsselt über HTTPS ausgeliefert. Auch die Verbindungen zum Kontaktformular${stats ? ' und zur Statistik' : ''} sind verschlüsselt, sodass Dritte die übertragenen Daten unterwegs nicht mitlesen können.</p>
+
+  <h2>${n(9)}. Änderungen</h2>
+  <p>Ändert sich die App oder ändern sich die genutzten Dienste, passe ich diese Datenschutzerklärung an. Es gilt die jeweils hier veröffentlichte Fassung. Ist für eine Änderung deine Einwilligung nötig, frage ich dich in der App vorher danach.</p>
 
   <p class="muted small">Stand: Oktober 2026</p>`;
 }

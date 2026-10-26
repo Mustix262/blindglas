@@ -23,7 +23,7 @@ export const LEGAL: LegalConfig = {
   /** Formspree-Formular-ID, z. B. "xyzabcde" aus https://formspree.io/f/xyzabcde */
   formspreeId: 'mdeeeoyn',
   /** GoatCounter-Code, z. B. "lastcall" für https://lastcall.goatcounter.com */
-  goatcounterCode: 'DEIN_GOATCOUNTER_CODE',
+  goatcounterCode: 'mdemiral',
   /** Für mich zuständige Datenschutz-Aufsichtsbehörde. */
   authority: {
     name: 'Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)',
